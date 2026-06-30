@@ -3,9 +3,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'POST 요청만 허용됩니다' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: '서버에 GEMINI_API_KEY가 설정되지 않았습니다' });
+    return res.status(500).json({ error: '서버에 ANTHROPIC_API_KEY가 설정되지 않았습니다' });
   }
 
   const { pdfBase64 } = req.body;
@@ -46,39 +46,46 @@ setGroup은 다문항 세트에 속하면 그룹ID(문자열), 아니면 null로
 sets가 없으면 빈 배열 []로 하세요.`;
 
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: 'application/pdf', data: pdfBase64 } },
-              { text: prompt }
-            ]
-          }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
-        })
-      }
-    );
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        temperature: 0,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 }
+            },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
 
-    if (!geminiRes.ok) {
-      const errData = await geminiRes.json().catch(() => ({}));
-      return res.status(geminiRes.status).json({
-        error: errData.error?.message || `Gemini API 오류 (${geminiRes.status})`
+    if (!claudeRes.ok) {
+      const errData = await claudeRes.json().catch(() => ({}));
+      return res.status(claudeRes.status).json({
+        error: errData.error?.message || `Claude API 오류 (${claudeRes.status})`
       });
     }
 
-    const data = await geminiRes.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const data = await claudeRes.json();
+    const raw = data.content?.find(c => c.type === 'text')?.text || '';
     const clean = raw.replace(/```json|```/g, '').trim();
 
     let parsed;
     try {
       parsed = JSON.parse(clean);
     } catch (parseErr) {
-      return res.status(502).json({ error: 'Gemini 응답을 JSON으로 해석하지 못했습니다', raw: clean });
+      return res.status(502).json({ error: 'Claude 응답을 JSON으로 해석하지 못했습니다', raw: clean });
     }
 
     return res.status(200).json(parsed);
