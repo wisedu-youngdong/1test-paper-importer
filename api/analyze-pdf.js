@@ -23,6 +23,11 @@ export default async function handler(req, res) {
 3. 한 지문을 여러 문항이 공유하는 "다문항 세트"를 감지하세요 (예: [41~43]번이 같은 지문 사용 → 장문독해 유형)
 4. 각 문항의 지문 첫 15단어 정도만 발췌하세요
 5. 각 지문의 대략적인 영어 단어 수를 추정하세요
+6. 각 지문의 읽기 난이도를 추정하세요:
+   - Lexile 지수 범위 (예: "900~960L") — 어휘 복잡도, 문장 길이, 구문 난이도 기준
+   - AR(Accelerated Reader) 지수 (예: 6.5) — 미국 학년 기준 환산치
+   - 난이도 레벨 1~5 (1=가장 쉬움, 5=가장 어려움) — 한국 수능 기준 체감 난이도
+   - 예상 오답률 범위 (예: "15~20%") — 난이도 레벨에 비례하여 추정
 
 [공식 카테고리 체계]
 ${categoriesPromptBlock()}
@@ -35,7 +40,11 @@ ${categoriesPromptBlock()}
       "type": "위 카테고리 체계의 정확한 유형명",
       "passagePreview": "지문 첫 15단어...",
       "wordCount": 90,
-      "setGroup": null
+      "setGroup": null,
+      "lexile": "900~960L",
+      "ar": 6.5,
+      "difficultyLevel": 2,
+      "errorRate": "15~20%"
     }
   ],
   "sets": [

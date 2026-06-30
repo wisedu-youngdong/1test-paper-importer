@@ -86,6 +86,33 @@
   .btn-back:hover { color: #1A5CB8; }
   .selected-summary { font-size: 13px; color: #374151; line-height: 1.6; }
 
+  /* === 문항 카드형 그리드 (Lexile/AR/난이도 포함) === */
+  .item-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .item-card2 {
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 14px;
+    cursor: pointer; transition: box-shadow .15s, transform .1s;
+  }
+  .item-card2:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+  .item-card2.set-item { background: #FFFBEB; }
+  .item-card2-checkrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .item-card2-checkrow input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+  .item-card2-num { font-size: 15px; font-weight: 700; color: #1A1A1A; flex: 1; }
+  .item-card2-level { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .item-card2-title { font-size: 13px; font-weight: 600; color: #1A1A1A; margin-bottom: 3px; }
+  .item-card2-sub { font-size: 11px; color: #6B7280; margin-bottom: 8px; }
+  .item-card2-passage {
+    font-size: 11.5px; color: #374151; line-height: 1.55; margin-bottom: 8px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .item-card2-stats { font-size: 10.5px; color: #9CA3AF; }
+  .item-card2-err { font-size: 10.5px; color: #9CA3AF; margin-top: 2px; }
+
+  .passage-modal-body {
+    font-size: 13px; line-height: 1.85; color: #374151; margin: 1rem 0;
+    background: #F9FAFB; border-radius: 8px; padding: 16px; border-left: 3px solid #1A5CB8;
+    max-height: 50vh; overflow-y: auto;
+  }
+
   /* === 2단계: 생성 설정 === */
   .select-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .select-bar .count { font-size: 13px; color: #1A5CB8; font-weight: 600; }
@@ -267,6 +294,18 @@
       <div id="itemList"></div>
 
       <button class="btn-go" id="toGenBtn" style="margin-top:1rem" disabled onclick="goToStep(2)">선택한 문항으로 문제 생성 설정 →</button>
+    </div>
+  </div>
+
+  <!-- === 전체 지문 보기 모달 === -->
+  <div class="modal-overlay" id="passageModal">
+    <div class="modal-box" style="max-width:600px">
+      <div class="modal-title" id="passageModalTitle">지문 미리보기</div>
+      <div class="modal-sub" id="passageModalMeta">-</div>
+      <div class="passage-modal-body" id="passageModalBody"></div>
+      <div class="modal-btns">
+        <button class="modal-btn-cancel" onclick="closePassageModal()">닫기</button>
+      </div>
     </div>
   </div>
 
@@ -661,6 +700,15 @@ goBtn.addEventListener('click', async () => {
   }
 });
 
+// 난이도 레벨별 색상 (1=쉬움 초록 ~ 5=어려움 빨강)
+const LEVEL_COLORS = {
+  1: { border: '#16a34a', bg: '#f0fdf4', text: '#166534' },
+  2: { border: '#65a30d', bg: '#f0fdf4', text: '#166534' },
+  3: { border: '#ca8a04', bg: '#fefce8', text: '#854d0e' },
+  4: { border: '#ea580c', bg: '#fff7ed', text: '#9a3412' },
+  5: { border: '#dc2626', bg: '#fef2f2', text: '#991b1b' }
+};
+
 function renderResult(data) {
   analyzedItems = data.items || [];
   analyzedSets = data.sets || [];
@@ -673,63 +721,118 @@ function renderResult(data) {
   document.getElementById('statWords').textContent = avg;
 
   const list = document.getElementById('itemList');
+  list.className = 'item-grid';
   list.innerHTML = '';
 
   analyzedItems.forEach(item => {
     const inSet = setMap[item.number];
-    const div = document.createElement('div');
-    div.className = 'item-row' + (inSet ? ' set-item' : '');
+    const level = item.difficultyLevel || 2;
+    const lc = LEVEL_COLORS[level] || LEVEL_COLORS[2];
 
+    const card = document.createElement('div');
+    card.className = 'item-card2' + (inSet ? ' set-item' : '');
+    card.style.borderLeft = `3px solid ${lc.border}`;
+
+    // 체크박스 (클릭 시 카드 자체 클릭과 분리되도록 상단에 고정)
+    const checkRow = document.createElement('div');
+    checkRow.className = 'item-card2-checkrow';
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = true;
     checkbox.dataset.number = item.number;
     checkbox.addEventListener('change', updateSelCount);
+    checkbox.addEventListener('click', (e) => e.stopPropagation());
+    checkRow.appendChild(checkbox);
 
-    const badge = document.createElement('div');
-    badge.className = 'num-badge' + (inSet ? ' warn' : '');
-    badge.textContent = item.number;
+    const numBadge = document.createElement('span');
+    numBadge.className = 'item-card2-num';
+    numBadge.textContent = item.number + '번';
+    checkRow.appendChild(numBadge);
 
-    const body = document.createElement('div');
-    body.className = 'item-body';
+    const levelBadge = document.createElement('span');
+    levelBadge.className = 'item-card2-level';
+    levelBadge.style.background = lc.bg;
+    levelBadge.style.color = lc.text;
+    levelBadge.textContent = 'Lv ' + level;
+    checkRow.appendChild(levelBadge);
 
-    const title = document.createElement('div');
-    title.className = 'item-title';
-    title.textContent = item.type || '유형 미상';
-    const tag = document.createElement('span');
+    // 유형명 + 그룹 태그
+    const titleLine = document.createElement('div');
+    titleLine.className = 'item-card2-title';
+    titleLine.textContent = item.type || '유형 미상';
+
+    const subLine = document.createElement('div');
+    subLine.className = 'item-card2-sub';
     const grp = findGroup(item.type);
-    if (inSet) {
-      tag.className = 'tag tag-set';
-      tag.textContent = '세트 ' + inSet.numbers.join('~') + '번';
-    } else {
-      tag.className = 'tag ' + (GROUP_COLORS[grp] || 'tag-blue');
-      tag.textContent = grp || '단일';
-    }
-    title.appendChild(tag);
+    const setLabel = inSet ? `세트 ${inSet.numbers.join('~')}번 · ` : '';
+    subLine.textContent = setLabel + (grp || '단일') + ' · ' + (item.wordCount || '?') + '단어';
 
-    const sub = document.createElement('div');
-    sub.className = 'item-sub';
-    sub.textContent = '지문 약 ' + (item.wordCount || '?') + '단어';
-
-    body.appendChild(title);
-    body.appendChild(sub);
-
+    // 지문 미리보기 (말줄임)
+    const passageBox = document.createElement('div');
+    passageBox.className = 'item-card2-passage';
     if (item.passagePreview) {
-      const prev = document.createElement('div');
-      prev.className = 'item-passage';
-      prev.textContent = '"' + item.passagePreview + ' ..."';
-      body.appendChild(prev);
+      passageBox.textContent = '"' + item.passagePreview + ' ..."';
     }
 
-    div.appendChild(checkbox);
-    div.appendChild(badge);
-    div.appendChild(body);
-    list.appendChild(div);
+    // Lexile / AR / 오답률
+    const statsLine = document.createElement('div');
+    statsLine.className = 'item-card2-stats';
+    const lexileText = item.lexile ? `Lexile ${item.lexile}` : '';
+    const arText = item.ar ? `AR ${item.ar}` : '';
+    const errText = item.errorRate ? `오답률 ${item.errorRate}` : '';
+    statsLine.textContent = [lexileText, arText].filter(Boolean).join(' · ');
+
+    const errLine = document.createElement('div');
+    errLine.className = 'item-card2-err';
+    errLine.textContent = errText;
+
+    card.appendChild(checkRow);
+    card.appendChild(titleLine);
+    card.appendChild(subLine);
+    card.appendChild(passageBox);
+    if (statsLine.textContent) card.appendChild(statsLine);
+    if (errText) card.appendChild(errLine);
+
+    // 카드 클릭 시 전체 지문 모달
+    card.addEventListener('click', () => openPassageModal(item, inSet));
+
+    list.appendChild(card);
   });
 
   document.getElementById('resultWrap').style.display = 'block';
   updateSelCount();
   persistSession();
+}
+
+function openPassageModal(item, inSet) {
+  const grp = findGroup(item.type);
+  document.getElementById('passageModalTitle').textContent =
+    item.number + '번 · ' + (item.type || '유형 미상');
+
+  const metaParts = [
+    grp || '단일',
+    (item.wordCount || '?') + '단어',
+    item.lexile ? 'Lexile ' + item.lexile : null,
+    item.ar ? 'AR ' + item.ar : null,
+    item.difficultyLevel ? 'Lv ' + item.difficultyLevel : null,
+    item.errorRate ? '오답률 ' + item.errorRate : null,
+    inSet ? '세트 ' + inSet.numbers.join('~') + '번' : null
+  ].filter(Boolean);
+  document.getElementById('passageModalMeta').textContent = metaParts.join(' · ');
+
+  const body = document.getElementById('passageModalBody');
+  if (item.passagePreview) {
+    body.innerHTML = '"' + item.passagePreview + ' ..."' +
+      '<div style="margin-top:10px;font-size:11px;color:#9CA3AF">※ 현재는 지문 앞부분 미리보기만 표시됩니다. 전체 원문 보기는 추후 업데이트 예정입니다.</div>';
+  } else {
+    body.textContent = '미리보기 정보가 없습니다.';
+  }
+
+  document.getElementById('passageModal').classList.add('show');
+}
+
+function closePassageModal() {
+  document.getElementById('passageModal').classList.remove('show');
 }
 
 function updateSelCount() {
