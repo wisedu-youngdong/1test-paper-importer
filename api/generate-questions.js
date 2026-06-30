@@ -85,7 +85,7 @@ groupSize/mode 규칙: 단일 문항은 groupSize=1, mode=null. 다문항 세트
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 16384 }
+          generationConfig: { temperature: 0.4, maxOutputTokens: 24576 }
         })
       }
     );
