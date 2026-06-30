@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1test 시험지 문항 분석기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    background: #F5F6F8;
+    color: #1A1A1A;
+    padding: 2rem 1rem;
+  }
+  .container { max-width: 680px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; color: #0D2D6B; }
+  .subtitle { font-size: 14px; color: #6B7280; margin-bottom: 1.5rem; }
+  .label { font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+  .drop {
+    border: 2px dashed #D1D5DB; border-radius: 12px; padding: 2rem; text-align: center;
+    cursor: pointer; transition: all .15s; margin-bottom: 1rem; background: #fff;
+  }
+  .drop:hover, .drop.over { background: #F0F7FF; border-color: #1A5CB8; }
+  .drop .main { font-size: 14px; font-weight: 500; }
+  .drop .sub { font-size: 12px; color: #6B7280; margin-top: 3px; }
+  .file-chip {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    background: #ECFDF5; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #A7F3D0;
+  }
+  .file-chip span { font-size: 13px; font-weight: 500; color: #047857; flex: 1; }
+  .file-chip button { background: none; border: none; cursor: pointer; color: #047857; font-size: 16px; }
+  .btn-go {
+    width: 100%; padding: 12px; border-radius: 8px; background: #1A5CB8; color: #fff;
+    border: none; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 1rem;
+  }
+  .btn-go:hover { background: #0D2D6B; }
+  .btn-go:disabled { opacity: .4; cursor: not-allowed; }
+  .progress { height: 4px; border-radius: 2px; background: #E5E7EB; overflow: hidden; margin-bottom: .5rem; display: none; }
+  .progress-bar { height: 100%; background: #1A5CB8; width: 0%; transition: width .4s; }
+  .status-msg { font-size: 12px; color: #6B7280; text-align: center; margin-bottom: 1rem; min-height: 16px; }
+  .err-box { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #B91C1C; margin-bottom: 1rem; display: none; }
+  .result-wrap { display: none; }
+  .stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 1rem; }
+  .stat { background: #F5F6F8; border-radius: 8px; padding: 12px; text-align: center; }
+  .stat .n { font-size: 24px; font-weight: 700; color: #0D2D6B; }
+  .stat .t { font-size: 11px; color: #6B7280; margin-top: 2px; }
+  .item-row { border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 10px; }
+  .item-row.set-item { border-color: #FDE68A; background: #FFFBEB; }
+  .num-badge {
+    width: 28px; height: 28px; border-radius: 50%; background: #DBEAFE; color: #1A5CB8;
+    font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .num-badge.warn { background: #F59E0B; color: #fff; }
+  .item-body { flex: 1; min-width: 0; }
+  .item-title { font-size: 13px; font-weight: 600; }
+  .item-sub { font-size: 11px; color: #6B7280; margin-top: 2px; }
+  .item-passage { font-size: 12px; color: #374151; margin-top: 6px; line-height: 1.55; background: #F9FAFB; border-radius: 4px; padding: 8px 10px; border-left: 3px solid #1A5CB8; }
+  .tag { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; margin-left: 6px; }
+  .tag-blue { background: #DBEAFE; color: #1A5CB8; }
+  .tag-warn { background: #FEF3C7; color: #92400E; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>1test 시험지 문항 분석기</h1>
+  <p class="subtitle">수능/모의고사 PDF를 업로드하면 문항 구조를 자동으로 분석합니다</p>
+
+  <div class="drop" id="dropzone" onclick="document.getElementById('fi').click()">
+    <div class="main">클릭 또는 드래그로 PDF 업로드</div>
+    <div class="sub">수능 · 모의고사 기출 디지털 PDF</div>
+  </div>
+  <input type="file" id="fi" accept=".pdf">
+
+  <div id="fileChip" style="display:none" class="file-chip">
+    <span id="fname"></span>
+    <button onclick="removeFile()">✕</button>
+  </div>
+
+  <div class="err-box" id="errBox"></div>
+
+  <button class="btn-go" id="goBtn" disabled>문항 분석 시작</button>
+
+  <div class="progress" id="prog"><div class="progress-bar" id="progBar"></div></div>
+  <div class="status-msg" id="statusMsg"></div>
+
+  <div class="result-wrap" id="resultWrap">
+    <div class="label">인식 결과</div>
+    <div class="stat-row">
+      <div class="stat"><div class="n" id="statItems">-</div><div class="t">총 문항</div></div>
+      <div class="stat"><div class="n" id="statSets">-</div><div class="t">다문항 세트</div></div>
+      <div class="stat"><div class="n" id="statWords">-</div><div class="t">평균 단어수</div></div>
+    </div>
+    <div id="itemList"></div>
+  </div>
+</div>
+
+<script>
+let pdfFile = null;
+const dropzone = document.getElementById('dropzone');
+const fi = document.getElementById('fi');
+const goBtn = document.getElementById('goBtn');
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type === 'application/pdf') handleFile(f);
+});
+fi.addEventListener('change', () => handleFile(fi.files[0]));
+
+function handleFile(f) {
+  if (!f) return;
+  pdfFile = f;
+  document.getElementById('fname').textContent = f.name + ' (' + Math.round(f.size/1024) + 'KB)';
+  document.getElementById('fileChip').style.display = 'flex';
+  dropzone.style.display = 'none';
+  goBtn.disabled = false;
+}
+
+function removeFile() {
+  pdfFile = null;
+  document.getElementById('fileChip').style.display = 'none';
+  dropzone.style.display = 'block';
+  fi.value = '';
+  goBtn.disabled = true;
+}
+
+function setProgress(p, msg) {
+  document.getElementById('prog').style.display = 'block';
+  document.getElementById('progBar').style.width = p + '%';
+  document.getElementById('statusMsg').textContent = msg;
+}
+
+function showErr(msg) {
+  const b = document.getElementById('errBox');
+  b.textContent = msg;
+  b.style.display = 'block';
+}
+
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+goBtn.addEventListener('click', async () => {
+  if (!pdfFile) return;
+  document.getElementById('errBox').style.display = 'none';
+  document.getElementById('resultWrap').style.display = 'none';
+  goBtn.disabled = true;
+  setProgress(15, 'PDF를 읽는 중...');
+
+  try {
+    const base64 = await toBase64(pdfFile);
+    setProgress(40, '서버로 전송 중...');
+
+    const res = await fetch('/api/analyze-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfBase64: base64 })
+    });
+
+    setProgress(75, '응답 처리 중...');
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '분석 실패');
+
+    setProgress(100, '분석 완료!');
+    renderResult(data);
+
+  } catch (e) {
+    setProgress(0, '');
+    document.getElementById('prog').style.display = 'none';
+    showErr('오류: ' + e.message);
+  } finally {
+    goBtn.disabled = false;
+  }
+});
+
+function renderResult(data) {
+  const items = data.items || [];
+  const sets = data.sets || [];
+  const setMap = {};
+  sets.forEach(s => s.numbers.forEach(n => setMap[n] = s));
+
+  document.getElementById('statItems').textContent = items.length;
+  document.getElementById('statSets').textContent = sets.length;
+  const avg = items.length ? Math.round(items.reduce((a,i) => a + (i.wordCount||0), 0) / items.length) : 0;
+  document.getElementById('statWords').textContent = avg;
+
+  const list = document.getElementById('itemList');
+  list.innerHTML = '';
+
+  items.forEach(item => {
+    const inSet = setMap[item.number];
+    const div = document.createElement('div');
+    div.className = 'item-row' + (inSet ? ' set-item' : '');
+
+    const badge = document.createElement('div');
+    badge.className = 'num-badge' + (inSet ? ' warn' : '');
+    badge.textContent = item.number;
+
+    const body = document.createElement('div');
+    body.className = 'item-body';
+
+    const title = document.createElement('div');
+    title.className = 'item-title';
+    title.textContent = item.type || '유형 미상';
+    const tag = document.createElement('span');
+    tag.className = 'tag ' + (inSet ? 'tag-warn' : 'tag-blue');
+    tag.textContent = inSet ? '세트 ' + inSet.numbers.join('~') + '번' : '단일';
+    title.appendChild(tag);
+
+    const sub = document.createElement('div');
+    sub.className = 'item-sub';
+    sub.textContent = '지문 약 ' + (item.wordCount || '?') + '단어';
+
+    body.appendChild(title);
+    body.appendChild(sub);
+
+    if (item.passagePreview) {
+      const prev = document.createElement('div');
+      prev.className = 'item-passage';
+      prev.textContent = '"' + item.passagePreview + ' ..."';
+      body.appendChild(prev);
+    }
+
+    div.appendChild(badge);
+    div.appendChild(body);
+    list.appendChild(div);
+  });
+
+  document.getElementById('resultWrap').style.display = 'block';
+}
+</script>
+</body>
+</html>

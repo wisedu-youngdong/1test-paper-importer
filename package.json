@@ -1,0 +1,6 @@
+{
+  "name": "1test-paper-importer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "1test.ai 영어 시험지 문항 자동 인식 프로토타입"
+}
