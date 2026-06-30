@@ -743,6 +743,12 @@ function stripHtmlTags(html) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// 혹시 AI가 [3점], (3점) 같은 배점 표기를 fullPassage에 끼워넣어도 화면 표시 전 제거 (안전망)
+function stripScoreMarkers(html) {
+  if (!html) return html;
+  return html.replace(/[\[(]\s*\d\s*점\s*[\])]/g, '').replace(/\s{2,}/g, ' ');
+}
+
 function renderResult(data) {
   let rawItems = (data.items || []).slice().sort((a, b) => a.number - b.number);
 
@@ -751,8 +757,10 @@ function renderResult(data) {
   analyzedItems = rawItems.filter(item => findGroup(item.type));
 
   // 단어수는 AI 추정값 대신 실제 fullPassage 기준으로 재계산 (정확도 보장)
+  // 배점 표기([3점] 등)는 표시 전 자동 제거 (안전망)
   analyzedItems.forEach(item => {
     if (item.fullPassage) {
+      item.fullPassage = stripScoreMarkers(item.fullPassage);
       item.wordCount = countWordsFromHTML(item.fullPassage);
     }
   });
