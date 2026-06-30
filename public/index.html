@@ -735,7 +735,12 @@ function countWordsFromHTML(html) {
 }
 
 function renderResult(data) {
-  analyzedItems = (data.items || []).slice().sort((a, b) => a.number - b.number);
+  let rawItems = (data.items || []).slice().sort((a, b) => a.number - b.number);
+
+  // 공식 25개 읽기 카테고리에 속하지 않는 항목은 듣기 오분류 가능성이 높으므로 제외
+  const filteredOut = rawItems.filter(item => !findGroup(item.type));
+  analyzedItems = rawItems.filter(item => findGroup(item.type));
+
   // 단어수는 AI 추정값 대신 실제 fullPassage 기준으로 재계산 (정확도 보장)
   analyzedItems.forEach(item => {
     if (item.fullPassage) {
@@ -764,6 +769,10 @@ function renderResult(data) {
     }
     if (missing.length > 0) {
       missingWarning.textContent = `⚠️ ${min}~${max}번 범위에서 ${missing.join(', ')}번이 누락된 것 같습니다. PDF를 다시 분석해보시는 것을 권장합니다.`;
+      missingWarning.style.display = 'block';
+    } else if (filteredOut.length > 0) {
+      const nums = filteredOut.map(i => i.number).join(', ');
+      missingWarning.textContent = `ℹ️ ${nums}번은 공식 읽기 유형에 속하지 않아 제외했습니다 (듣기 문항으로 오인식되었을 가능성).`;
       missingWarning.style.display = 'block';
     } else {
       missingWarning.style.display = 'none';
