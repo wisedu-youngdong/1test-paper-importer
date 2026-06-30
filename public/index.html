@@ -48,6 +48,7 @@
   .progress-bar { height: 100%; background: #1A5CB8; width: 0%; transition: width .4s; }
   .status-msg { font-size: 12px; color: #6B7280; text-align: center; margin-bottom: 1rem; min-height: 16px; }
   .err-box { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #B91C1C; margin-bottom: 1rem; display: none; }
+  .missing-warning { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #92400E; margin-bottom: 1rem; font-weight: 500; }
   .result-wrap { display: none; }
   .stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 1rem; }
   .stat { background: #F5F6F8; border-radius: 8px; padding: 12px; text-align: center; }
@@ -293,6 +294,8 @@
         <div class="stat"><div class="n" id="statSets">-</div><div class="t">다문항 세트</div></div>
         <div class="stat"><div class="n" id="statWords">-</div><div class="t">평균 단어수</div></div>
       </div>
+
+      <div class="missing-warning" id="missingWarning" style="display:none"></div>
 
       <div class="select-bar">
         <span class="count" id="selCount">0개 선택됨</span>
@@ -727,6 +730,27 @@ function renderResult(data) {
   document.getElementById('statSets').textContent = analyzedSets.length;
   const avg = analyzedItems.length ? Math.round(analyzedItems.reduce((a,i) => a + (i.wordCount||0), 0) / analyzedItems.length) : 0;
   document.getElementById('statWords').textContent = avg;
+
+  // === 문항 번호 누락 감지 ===
+  const missingWarning = document.getElementById('missingWarning');
+  if (analyzedItems.length >= 2) {
+    const numbers = analyzedItems.map(i => i.number);
+    const min = Math.min(...numbers);
+    const max = Math.max(...numbers);
+    const numSet = new Set(numbers);
+    const missing = [];
+    for (let n = min; n <= max; n++) {
+      if (!numSet.has(n)) missing.push(n);
+    }
+    if (missing.length > 0) {
+      missingWarning.textContent = `⚠️ ${min}~${max}번 범위에서 ${missing.join(', ')}번이 누락된 것 같습니다. PDF를 다시 분석해보시는 것을 권장합니다.`;
+      missingWarning.style.display = 'block';
+    } else {
+      missingWarning.style.display = 'none';
+    }
+  } else {
+    missingWarning.style.display = 'none';
+  }
 
   const list = document.getElementById('itemList');
   list.className = 'item-grid';
