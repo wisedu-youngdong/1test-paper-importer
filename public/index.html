@@ -99,14 +99,17 @@
   .item-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
   .item-card2 {
     background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 14px;
-    cursor: pointer; transition: box-shadow .15s, transform .1s;
   }
-  .item-card2:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
   .item-card2.set-item { background: #FFFBEB; }
-  .item-card2-checkrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .item-card2-checkrow {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    padding: 4px; margin-left: -4px; border-radius: 6px; cursor: pointer; width: fit-content;
+    transition: background .12s;
+  }
+  .item-card2-checkrow:hover { background: #F0F7FF; }
   .item-card2-checkrow input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
-  .item-card2-num { font-size: 15px; font-weight: 700; color: #1A1A1A; flex: 1; }
-  .item-card2-level { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .item-card2-num { font-size: 15px; font-weight: 700; color: #1A1A1A; }
+  .item-card2-level { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
   .item-card2-title { font-size: 13px; font-weight: 600; color: #1A1A1A; margin-bottom: 3px; }
   .item-card2-sub { font-size: 11px; color: #6B7280; margin-bottom: 8px; }
   .item-card2-passage {
@@ -118,6 +121,14 @@
   .pill-lexile { background: #EFF6FF; color: #1A5CB8; }
   .pill-ar { background: #F0FDF4; color: #15803D; }
   .pill-err { background: #FEF2F2; color: #B91C1C; }
+  .item-card2-viewbtn {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 11.5px; color: #1A5CB8; font-weight: 600; background: none; border: none;
+    cursor: pointer; padding: 8px 0 0; margin-top: 6px; width: 100%;
+    border-top: 1px dashed #E5E7EB;
+  }
+  .item-card2-viewbtn:hover { color: #0D2D6B; }
+  .item-card2-viewbtn i { font-size: 13px; }
 
   .passage-modal-body {
     font-size: 13px; line-height: 1.85; color: #374151; margin: 1rem 0;
@@ -811,7 +822,7 @@ function renderResult(data) {
     card.className = 'item-card2' + (inSet ? ' set-item' : '');
     card.style.borderLeft = `3px solid ${lc.border}`;
 
-    // 체크박스 (클릭 시 카드 자체 클릭과 분리되도록 상단에 고정)
+    // 체크박스 (클릭 영역을 줄 전체로 넓혀 토글 — 카드 전체 클릭과 분리)
     const checkRow = document.createElement('div');
     checkRow.className = 'item-card2-checkrow';
     const checkbox = document.createElement('input');
@@ -834,6 +845,12 @@ function renderResult(data) {
     levelBadge.textContent = 'Lv ' + level;
     checkRow.appendChild(levelBadge);
 
+    // checkRow 줄 전체를 클릭하면 체크박스 토글 (체크박스 자체 클릭은 위에서 stopPropagation 처리됨)
+    checkRow.addEventListener('click', () => {
+      checkbox.checked = !checkbox.checked;
+      updateSelCount();
+    });
+
     // 유형명 + 그룹 태그
     const titleLine = document.createElement('div');
     titleLine.className = 'item-card2-title';
@@ -845,7 +862,7 @@ function renderResult(data) {
     const setLabel = inSet ? `세트 ${inSet.numbers.join('~')}번 · ` : '';
     subLine.textContent = setLabel + (grp || '단일') + ' · ' + (item.wordCount || '?') + '단어';
 
-    // 지문 미리보기 (말줄임)
+    // 지문 미리보기 (말줄임) — 클릭해도 반응 없음, 순수 정보 표시용
     const passageBox = document.createElement('div');
     passageBox.className = 'item-card2-passage';
     if (item.passagePreview) {
@@ -877,15 +894,23 @@ function renderResult(data) {
       errRow.appendChild(errPill);
     }
 
+    // 지문 전체보기 — 이 버튼만 모달을 엶 (카드 전체 클릭은 제거)
+    const viewBtn = document.createElement('button');
+    viewBtn.className = 'item-card2-viewbtn';
+    viewBtn.type = 'button';
+    viewBtn.innerHTML = '<i class="ti ti-file-text" aria-hidden="true"></i> 지문 전체보기';
+    viewBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPassageModal(item, inSet);
+    });
+
     card.appendChild(checkRow);
     card.appendChild(titleLine);
     card.appendChild(subLine);
     card.appendChild(passageBox);
     if (statsRow.children.length) card.appendChild(statsRow);
     if (errRow.children.length) card.appendChild(errRow);
-
-    // 카드 클릭 시 전체 지문 모달
-    card.addEventListener('click', () => openPassageModal(item, inSet));
+    card.appendChild(viewBtn);
 
     list.appendChild(card);
   });
