@@ -721,8 +721,27 @@ const LEVEL_COLORS = {
   5: { border: '#dc2626', bg: '#fef2f2', text: '#991b1b' }
 };
 
+// HTML 마커(<br>, <u> 등)를 제거하고 실제 영어 단어 개수를 정확히 센다 (AI 추정 대신 직접 계산)
+function countWordsFromHTML(html) {
+  if (!html) return 0;
+  const text = html
+    .replace(/<[^>]+>/g, ' ')        // HTML 태그 제거
+    .replace(/[①②③④⑤]/g, ' ')      // 번호 마커 제거 (단어로 안 셈)
+    .replace(/_{3,}/g, ' ')           // 빈칸 마커 제거
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return 0;
+  return text.split(' ').filter(Boolean).length;
+}
+
 function renderResult(data) {
   analyzedItems = (data.items || []).slice().sort((a, b) => a.number - b.number);
+  // 단어수는 AI 추정값 대신 실제 fullPassage 기준으로 재계산 (정확도 보장)
+  analyzedItems.forEach(item => {
+    if (item.fullPassage) {
+      item.wordCount = countWordsFromHTML(item.fullPassage);
+    }
+  });
   analyzedSets = data.sets || [];
   const setMap = {};
   analyzedSets.forEach(s => s.numbers.forEach(n => setMap[n] = s));
@@ -855,7 +874,17 @@ function openPassageModal(item, inSet) {
 
   const body = document.getElementById('passageModalBody');
   if (item.fullPassage) {
-    body.innerHTML = item.fullPassage;
+    if (item.fullPassage.includes('[[SUMMARY]]')) {
+      // 문장요약 유형: 지문 → 화살표 → 요약문 박스로 분리 표시
+      const [passagePart, summaryPart] = item.fullPassage.split('[[SUMMARY]]');
+      body.innerHTML = `
+        <div>${passagePart}</div>
+        <div style="text-align:center; font-size:20px; color:#9CA3AF; margin:14px 0;">↓</div>
+        <div style="background:#fff; border:1px solid #D1D5DB; border-radius:6px; padding:12px 14px;">${summaryPart || ''}</div>
+      `;
+    } else {
+      body.innerHTML = item.fullPassage;
+    }
   } else if (item.passagePreview) {
     body.innerHTML = '"' + item.passagePreview + ' ..."' +
       '<div style="margin-top:10px;font-size:11px;color:#9CA3AF">※ 전체 지문 정보가 없어 미리보기만 표시됩니다.</div>';
