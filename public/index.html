@@ -66,6 +66,26 @@
   .tag-set { background: #FFE4E6; color: #BE123C; }
   input[type=file] { display: none; }
 
+  /* === STEP 화면 전환 === */
+  .step-indicator { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 2rem; }
+  .step-dot {
+    display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9CA3AF; font-weight: 600;
+  }
+  .step-dot span {
+    width: 24px; height: 24px; border-radius: 50%; background: #E5E7EB; color: #6B7280;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+  }
+  .step-dot.active { color: #1A5CB8; }
+  .step-dot.active span { background: #1A5CB8; color: #fff; }
+  .step-dot.done span { background: #10B981; color: #fff; }
+  .step-line { width: 32px; height: 1px; background: #E5E7EB; }
+  .btn-back {
+    background: none; border: none; color: #6B7280; font-size: 13px; cursor: pointer;
+    margin-bottom: 1rem; padding: 4px 0; font-weight: 500;
+  }
+  .btn-back:hover { color: #1A5CB8; }
+  .selected-summary { font-size: 13px; color: #374151; line-height: 1.6; }
+
   /* === 2단계: 생성 설정 === */
   .select-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .select-bar .count { font-size: 13px; color: #1A5CB8; font-weight: 600; }
@@ -194,82 +214,108 @@
   <h1>1test 시험지 문항 분석기</h1>
   <p class="subtitle">수능/모의고사 PDF를 업로드하면 문항 구조를 자동으로 분석합니다</p>
 
-  <!-- === 저장된 세트 목록 (페이지 진입 시 항상 표시) === -->
-  <div class="card" id="savedSetsCard" style="display:none">
-    <div class="label">저장된 문제 세트</div>
-    <div id="savedSetsList"></div>
+  <!-- === STEP 인디케이터 === -->
+  <div class="step-indicator">
+    <div class="step-dot active" id="stepDot1"><span>1</span> 업로드·분석</div>
+    <div class="step-line"></div>
+    <div class="step-dot" id="stepDot2"><span>2</span> 문항선택·설정</div>
+    <div class="step-line"></div>
+    <div class="step-dot" id="stepDot3"><span>3</span> 생성 결과</div>
   </div>
 
-  <div class="drop" id="dropzone" onclick="document.getElementById('fi').click()">
-    <div class="main">클릭 또는 드래그로 PDF 업로드</div>
-    <div class="sub">수능 · 모의고사 기출 디지털 PDF</div>
-  </div>
-  <input type="file" id="fi" accept=".pdf">
+  <!-- =========================================== -->
+  <!-- STEP 1: 업로드 + 분석 -->
+  <!-- =========================================== -->
+  <div class="step-screen" id="stepScreen1">
 
-  <div id="fileChip" style="display:none" class="file-chip">
-    <span id="fname"></span>
-    <button onclick="removeFile()">✕</button>
-  </div>
-
-  <div class="err-box" id="errBox"></div>
-
-  <button class="btn-go" id="goBtn" disabled>문항 분석 시작</button>
-
-  <div class="progress" id="prog"><div class="progress-bar" id="progBar"></div></div>
-  <div class="status-msg" id="statusMsg"></div>
-
-  <div class="result-wrap" id="resultWrap">
-    <div class="label">인식 결과</div>
-    <div class="stat-row">
-      <div class="stat"><div class="n" id="statItems">-</div><div class="t">총 문항</div></div>
-      <div class="stat"><div class="n" id="statSets">-</div><div class="t">다문항 세트</div></div>
-      <div class="stat"><div class="n" id="statWords">-</div><div class="t">평균 단어수</div></div>
+    <div class="card" id="savedSetsCard" style="display:none">
+      <div class="label">저장된 문제 세트</div>
+      <div id="savedSetsList"></div>
     </div>
 
-    <div class="select-bar">
-      <span class="count" id="selCount">0개 선택됨</span>
-      <button onclick="toggleAll()">전체 선택/해제</button>
+    <div class="drop" id="dropzone" onclick="document.getElementById('fi').click()">
+      <div class="main">클릭 또는 드래그로 PDF 업로드</div>
+      <div class="sub">수능 · 모의고사 기출 디지털 PDF</div>
+    </div>
+    <input type="file" id="fi" accept=".pdf">
+
+    <div id="fileChip" style="display:none" class="file-chip">
+      <span id="fname"></span>
+      <button onclick="removeFile()">✕</button>
     </div>
 
-    <div id="itemList"></div>
+    <div class="err-box" id="errBox"></div>
 
-    <button class="btn-go" id="toGenBtn" style="margin-top:1rem" disabled onclick="openGenPanel()">선택한 문항으로 문제 생성 설정 →</button>
+    <button class="btn-go" id="goBtn" disabled>문항 분석 시작</button>
+
+    <div class="progress" id="prog"><div class="progress-bar" id="progBar"></div></div>
+    <div class="status-msg" id="statusMsg"></div>
+
+    <div class="result-wrap" id="resultWrap">
+      <div class="label">인식 결과</div>
+      <div class="stat-row">
+        <div class="stat"><div class="n" id="statItems">-</div><div class="t">총 문항</div></div>
+        <div class="stat"><div class="n" id="statSets">-</div><div class="t">다문항 세트</div></div>
+        <div class="stat"><div class="n" id="statWords">-</div><div class="t">평균 단어수</div></div>
+      </div>
+
+      <div class="select-bar">
+        <span class="count" id="selCount">0개 선택됨</span>
+        <button onclick="toggleAll()">전체 선택/해제</button>
+      </div>
+
+      <div id="itemList"></div>
+
+      <button class="btn-go" id="toGenBtn" style="margin-top:1rem" disabled onclick="goToStep(2)">선택한 문항으로 문제 생성 설정 →</button>
+    </div>
   </div>
 
-  <!-- === 2단계: 생성 설정 패널 === -->
-  <div class="gen-panel" id="genPanel">
-    <div class="label">문제 생성 설정</div>
-    <div class="gen-layout">
+  <!-- =========================================== -->
+  <!-- STEP 2: 문항 선택 결과 + 생성 설정 -->
+  <!-- =========================================== -->
+  <div class="step-screen" id="stepScreen2" style="display:none">
 
-      <div class="gen-left">
-        <div class="gen-panel-title">문제 유형 선택</div>
-        <div class="gen-panel-sub">생성하고 싶은 유형을 카테고리별로 선택하세요 (복수 선택 가능)</div>
-        <div id="typeGroups"></div>
-      </div>
+    <button class="btn-back" onclick="goToStep(1)">← 이전 단계로</button>
 
-      <div class="gen-right">
-        <div class="gen-row">
-          <label>문항 배수 (선택 문항당 생성할 문제 수)</label>
-          <div class="slider-row">
-            <input type="range" id="multSlider" min="1" max="5" value="2" step="1">
-            <span class="val" id="multVal">2배</span>
-          </div>
+    <div class="card" style="margin-bottom:1rem">
+      <div class="label">선택된 문항</div>
+      <div id="selectedItemsSummary" class="selected-summary"></div>
+    </div>
+
+    <div class="gen-panel" id="genPanel" style="display:block">
+      <div class="label">문제 생성 설정</div>
+      <div class="gen-layout">
+
+        <div class="gen-left">
+          <div class="gen-panel-title">문제 유형 선택</div>
+          <div class="gen-panel-sub">생성하고 싶은 유형을 카테고리별로 선택하세요 (복수 선택 가능)</div>
+          <div id="typeGroups"></div>
         </div>
 
-        <div class="gen-row">
-          <label>난이도 조정</label>
-          <div class="slider-row">
-            <input type="range" id="diffSlider" min="-1" max="1" value="0" step="1">
-            <span class="val" id="diffVal" style="font-size:12px">원본</span>
+        <div class="gen-right">
+          <div class="gen-row">
+            <label>문항 배수 (선택 문항당 생성할 문제 수)</label>
+            <div class="slider-row">
+              <input type="range" id="multSlider" min="1" max="5" value="2" step="1">
+              <span class="val" id="multVal">2배</span>
+            </div>
           </div>
+
+          <div class="gen-row">
+            <label>난이도 조정</label>
+            <div class="slider-row">
+              <input type="range" id="diffSlider" min="-1" max="1" value="0" step="1">
+              <span class="val" id="diffVal" style="font-size:12px">원본</span>
+            </div>
+          </div>
+
+          <button class="btn-gen" id="previewBtn">생성 전 미리보기</button>
+          <div class="progress" id="genProg"><div class="progress-bar" id="genProgBar"></div></div>
+          <div class="status-msg" id="genStatusMsg"></div>
+          <div class="err-box" id="genErrBox"></div>
         </div>
 
-        <button class="btn-gen" id="previewBtn">생성 전 미리보기</button>
-        <div class="progress" id="genProg"><div class="progress-bar" id="genProgBar"></div></div>
-        <div class="status-msg" id="genStatusMsg"></div>
-        <div class="err-box" id="genErrBox"></div>
       </div>
-
     </div>
   </div>
 
@@ -297,18 +343,27 @@
     </div>
   </div>
 
-  <div class="gen-result" id="genResult">
-    <div class="save-bar card">
-      <div class="label" style="margin-bottom:8px">이 문제 세트 저장하기</div>
-      <div class="save-row">
-        <input type="text" id="setNameInput" placeholder="예: 양영중 3-1 기말 변형문제">
-        <button class="btn-save" id="saveSetBtn">저장</button>
+  <!-- =========================================== -->
+  <!-- STEP 3: 생성 결과 (콘텐츠 많아지면 자연스럽게 스크롤) -->
+  <!-- =========================================== -->
+  <div class="step-screen" id="stepScreen3" style="display:none">
+
+    <button class="btn-back" onclick="goToStep(2)">← 설정으로 돌아가기</button>
+
+    <div class="gen-result" id="genResult" style="display:block">
+      <div class="save-bar card">
+        <div class="label" style="margin-bottom:8px">이 문제 세트 저장하기</div>
+        <div class="save-row">
+          <input type="text" id="setNameInput" placeholder="예: 양영중 3-1 기말 변형문제">
+          <button class="btn-save" id="saveSetBtn">저장</button>
+        </div>
+        <div class="save-msg" id="saveMsg"></div>
       </div>
-      <div class="save-msg" id="saveMsg"></div>
+
+      <div class="label">생성된 문제</div>
+      <div id="genQList"></div>
     </div>
 
-    <div class="label">생성된 문제</div>
-    <div id="genQList"></div>
   </div>
 
 </div>
@@ -459,7 +514,6 @@ function loadSet(id) {
   analyzedSets = set.analyzedSets || [];
 
   renderGenResult({ questions: set.questions });
-  document.getElementById('genResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function deleteSet(id) {
@@ -518,7 +572,6 @@ function restoreSession() {
     }
     if (data.questions && data.questions.length) {
       renderGenResult({ questions: data.questions });
-      document.getElementById('genPanel').style.display = 'block';
     }
   } catch (e) { /* 무시 */ }
 }
@@ -692,9 +745,28 @@ function toggleAll() {
   updateSelCount();
 }
 
-function openGenPanel() {
-  document.getElementById('genPanel').style.display = 'block';
-  document.getElementById('genPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+// === STEP 화면 전환 라우터 ===
+function goToStep(n) {
+  [1, 2, 3].forEach(i => {
+    document.getElementById('stepScreen' + i).style.display = (i === n) ? 'block' : 'none';
+    const dot = document.getElementById('stepDot' + i);
+    dot.classList.toggle('active', i === n);
+    dot.classList.toggle('done', i < n);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (n === 2) renderSelectedItemsSummary();
+}
+
+function renderSelectedItemsSummary() {
+  const selectedNumbers = [...document.querySelectorAll('#itemList input[type=checkbox]:checked')]
+    .map(cb => parseInt(cb.dataset.number));
+  const el = document.getElementById('selectedItemsSummary');
+  if (selectedNumbers.length === 0) {
+    el.textContent = '선택된 문항이 없습니다.';
+    return;
+  }
+  el.textContent = selectedNumbers.join(', ') + '번 (총 ' + selectedNumbers.length + '개 문항)';
 }
 
 // === 2단계: 생성 설정 인터랙션 ===
@@ -887,7 +959,7 @@ function renderGenResult(data) {
   });
 
   document.getElementById('genResult').style.display = 'block';
-  document.getElementById('genResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  goToStep(3);
   persistSession();
 }
 
