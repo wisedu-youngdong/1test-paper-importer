@@ -103,10 +103,11 @@
   .gen-q-text { font-size: 13px; line-height: 1.6; margin-bottom: 8px; }
   .gen-q-opts { font-size: 13px; color: #374151; line-height: 1.9; }
   .gen-q-answer { font-size: 12px; color: #047857; margin-top: 8px; font-weight: 600; }
-  .gen-q-question-line { font-size: 13px; font-weight: 700; color: #1A1A1A; margin-bottom: 8px; }
+  .gen-q-question-line { font-size: 13px; font-weight: 700; color: #1A1A1A; margin-bottom: 12px; line-height: 1.6; }
   .gen-q-content {
-    font-size: 13px; line-height: 1.7; color: #374151; margin-bottom: 10px;
-    background: #F9FAFB; border-radius: 6px; padding: 10px 12px; border-left: 3px solid #1A5CB8;
+    font-size: 13px; line-height: 1.85; color: #374151; margin-bottom: 14px;
+    background: #F9FAFB; border-radius: 6px; padding: 14px 16px; border-left: 3px solid #1A5CB8;
+    white-space: pre-line;
   }
   .gen-q-content u { text-decoration: underline; color: #BE123C; font-weight: 600; }
   .btn-expl-toggle {
@@ -847,9 +848,15 @@ function buildQuestionCard(q, idx) {
   questionLine.textContent = q.question || '';
 
   // 지문 본문 (HTML 마커 포함 가능: <br>, <u>, ①②③④⑤ 등)
+  // content가 question과 동일하거나 비어있으면 표시하지 않음 (AI 실수로 인한 중복 방지)
   const contentBox = document.createElement('div');
   contentBox.className = 'gen-q-content';
-  contentBox.innerHTML = q.content || q.question || '';
+  const hasDistinctContent = q.content && q.content.trim() && q.content.trim() !== (q.question || '').trim();
+  if (hasDistinctContent) {
+    contentBox.innerHTML = q.content;
+  } else {
+    contentBox.style.display = 'none';
+  }
 
   const opts = document.createElement('div');
   opts.className = 'gen-q-opts';
