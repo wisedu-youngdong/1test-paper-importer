@@ -61,6 +61,9 @@
   .tag { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; margin-left: 6px; }
   .tag-blue { background: #DBEAFE; color: #1A5CB8; }
   .tag-warn { background: #FEF3C7; color: #92400E; }
+  .tag-green2 { background: #D1FAE5; color: #047857; }
+  .tag-purple { background: #EDE9FE; color: #6D28D9; }
+  .tag-set { background: #FFE4E6; color: #BE123C; }
   input[type=file] { display: none; }
 
   /* === 2단계: 생성 설정 === */
@@ -80,6 +83,8 @@
   }
   .type-opt:hover { border-color: #1A5CB8; }
   .type-opt.on { border-color: #1A5CB8; background: #EFF6FF; color: #1A5CB8; font-weight: 600; }
+  .type-group { margin-bottom: 12px; }
+  .type-group-label { font-size: 11px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
   .btn-gen {
     width: 100%; padding: 12px; border-radius: 8px; background: #0D2D6B; color: #fff;
     border: none; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px;
@@ -157,14 +162,7 @@
 
     <div class="gen-row">
       <label>문제 유형 (복수 선택 가능)</label>
-      <div class="type-grid" id="typeGrid">
-        <div class="type-opt on" data-type="어휘·동의어">어휘·동의어</div>
-        <div class="type-opt on" data-type="빈칸 완성">빈칸 완성</div>
-        <div class="type-opt" data-type="내용 일치">내용 일치</div>
-        <div class="type-opt" data-type="순서 배열">순서 배열</div>
-        <div class="type-opt" data-type="주제 추론">주제 추론</div>
-        <div class="type-opt" data-type="문장 삽입">문장 삽입</div>
-      </div>
+      <div id="typeGroups"></div>
     </div>
 
     <button class="btn-gen" id="genBtn">문제 생성하기</button>
@@ -187,6 +185,61 @@ let analyzedSets = [];
 const dropzone = document.getElementById('dropzone');
 const fi = document.getElementById('fi');
 const goBtn = document.getElementById('goBtn');
+
+// === 공식 문항 유형 카테고리 (18~45번 기준, 읽기 영역) ===
+const QUESTION_CATEGORIES = [
+  { group: "정보확인형", types: ["글의목적", "주장/시사", "일치/불일치(도표자료)", "일치/불일치(내용)", "일치/불일치(실용자료)"] },
+  { group: "내용이해형", types: ["심경/분위기", "밑줄함축의미", "요지", "주제", "제목"] },
+  { group: "언어분석형", types: ["문맥속어법(밑줄형)", "문맥속어법(선택형)", "문맥속어휘(밑줄형)", "문맥속어휘(선택형)"] },
+  { group: "논리구성형", types: ["빈칸추론", "무관한문장찾기", "글의순서배열", "문장삽입", "문장요약"] },
+  { group: "장문독해", types: ["장문독해(1지문2문항)", "장문독해(1지문3문항)"] }
+];
+
+function findGroup(typeName) {
+  const found = QUESTION_CATEGORIES.find(c => c.types.includes(typeName));
+  return found ? found.group : null;
+}
+
+// 그룹별 태그 색상
+const GROUP_COLORS = {
+  "정보확인형": "tag-blue",
+  "내용이해형": "tag-green2",
+  "언어분석형": "tag-purple",
+  "논리구성형": "tag-warn",
+  "장문독해": "tag-set"
+};
+
+function renderTypeGroups() {
+  const wrap = document.getElementById('typeGroups');
+  wrap.innerHTML = '';
+  QUESTION_CATEGORIES.forEach(cat => {
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'type-group';
+
+    const label = document.createElement('div');
+    label.className = 'type-group-label';
+    label.textContent = cat.group;
+    groupDiv.appendChild(label);
+
+    const grid = document.createElement('div');
+    grid.className = 'type-grid';
+    cat.types.forEach((t, idx) => {
+      const opt = document.createElement('div');
+      opt.className = 'type-opt';
+      opt.dataset.type = t;
+      opt.textContent = t;
+      // 기본값: 정보확인형/내용이해형 첫 2개만 on
+      if ((cat.group === '정보확인형' && idx === 0) || (cat.group === '내용이해형' && idx === 0)) {
+        opt.classList.add('on');
+      }
+      opt.addEventListener('click', () => opt.classList.toggle('on'));
+      grid.appendChild(opt);
+    });
+    groupDiv.appendChild(grid);
+    wrap.appendChild(groupDiv);
+  });
+}
+renderTypeGroups();
 
 dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
 dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
@@ -306,8 +359,14 @@ function renderResult(data) {
     title.className = 'item-title';
     title.textContent = item.type || '유형 미상';
     const tag = document.createElement('span');
-    tag.className = 'tag ' + (inSet ? 'tag-warn' : 'tag-blue');
-    tag.textContent = inSet ? '세트 ' + inSet.numbers.join('~') + '번' : '단일';
+    const grp = findGroup(item.type);
+    if (inSet) {
+      tag.className = 'tag tag-set';
+      tag.textContent = '세트 ' + inSet.numbers.join('~') + '번';
+    } else {
+      tag.className = 'tag ' + (GROUP_COLORS[grp] || 'tag-blue');
+      tag.textContent = grp || '단일';
+    }
     title.appendChild(tag);
 
     const sub = document.createElement('div');
@@ -364,9 +423,7 @@ diffSlider.addEventListener('input', () => {
   document.getElementById('diffVal').textContent = m[diffSlider.value];
 });
 
-document.querySelectorAll('.type-opt').forEach(opt => {
-  opt.addEventListener('click', () => opt.classList.toggle('on'));
-});
+// (유형 클릭 이벤트는 renderTypeGroups() 안에서 동적으로 등록됨)
 
 document.getElementById('genBtn').addEventListener('click', async () => {
   const selectedNumbers = [...document.querySelectorAll('#itemList input[type=checkbox]:checked')]

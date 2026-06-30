@@ -1,3 +1,5 @@
+import { categoriesPromptBlock } from '../lib/categories.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST 요청만 허용됩니다' });
@@ -23,12 +25,16 @@ export default async function handler(req, res) {
 [선택된 원본 문항]
 ${itemsDesc}
 
+[공식 카테고리 체계 — 반드시 이 안에서만 유형을 선택하세요]
+${categoriesPromptBlock()}
+(듣기 영역은 제외, 읽기/독해 유형만 사용)
+
 [생성 조건]
 - 각 원본 문항마다 ${multiplier}개씩 새로운 문제를 생성하세요
 - 난이도: ${difficulty}
-- 적용할 문제 유형: ${types.join(', ')} 중에서 다양하게 섞어서 출제하세요
+- 적용할 문제 유형: ${types.join(', ')} 중에서 다양하게 섞어서 출제하세요 (반드시 위 공식 카테고리 명칭 그대로 사용)
 - 원본 지문의 주제와 어휘 수준을 참고하되, 표현은 새롭게 작성하세요 (원문 그대로 베끼지 마세요)
-- 각 문제는 4지선다 객관식으로 작성하세요 (단, 영작/순서배열 유형은 예외적으로 다른 형식 가능)
+- 각 문제는 4지선다 객관식으로 작성하세요 (단, 글의순서배열/문장삽입 유형은 예외적으로 다른 형식 가능)
 - 정답과 함께 한 줄 해설(인과관계 중심)을 포함하세요
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트나 설명 없이:
@@ -36,7 +42,7 @@ ${itemsDesc}
   "questions": [
     {
       "sourceNumber": 41,
-      "type": "빈칸 완성",
+      "type": "공식 카테고리의 정확한 유형명",
       "question": "문제 본문 (지문 포함 가능)",
       "options": ["선택지1", "선택지2", "선택지3", "선택지4"],
       "answer": "정답 선택지 번호 또는 내용",

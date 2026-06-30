@@ -1,3 +1,5 @@
+import { categoriesPromptBlock } from '../lib/categories.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST 요청만 허용됩니다' });
@@ -17,17 +19,20 @@ export default async function handler(req, res) {
 이 PDF는 영어 시험지입니다. 다음을 정확히 분석해주세요:
 
 1. 각 문항 번호(1번, 2번 등)를 찾아내세요
-2. 각 문항의 유형을 파악하세요 (주제파악/빈칸추론/내용일치/순서배열/어휘/필자태도/요약/글의목적 등)
-3. 한 지문을 여러 문항이 공유하는 "다문항 세트"를 감지하세요 (예: [41~43]번이 같은 지문 사용)
+2. 각 문항의 유형을 아래 [공식 카테고리 체계]에서 정확히 하나를 골라 분류하세요. 목록에 없는 임의 명칭을 만들지 마세요.
+3. 한 지문을 여러 문항이 공유하는 "다문항 세트"를 감지하세요 (예: [41~43]번이 같은 지문 사용 → 장문독해 유형)
 4. 각 문항의 지문 첫 15단어 정도만 발췌하세요
 5. 각 지문의 대략적인 영어 단어 수를 추정하세요
+
+[공식 카테고리 체계]
+${categoriesPromptBlock()}
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이:
 {
   "items": [
     {
       "number": 1,
-      "type": "문항유형",
+      "type": "위 카테고리 체계의 정확한 유형명",
       "passagePreview": "지문 첫 15단어...",
       "wordCount": 90,
       "setGroup": null
