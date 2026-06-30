@@ -125,7 +125,7 @@
     align-items: center; justify-content: center; z-index: 50; padding: 1rem;
   }
   .modal-overlay.show { display: flex; }
-  .modal-box { background: #fff; border-radius: 12px; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 1.5rem; }
+  .modal-box { background: #fff; border-radius: 12px; max-width: 640px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 1.5rem; }
   .modal-title { font-size: 16px; font-weight: 700; color: #0D2D6B; margin-bottom: 4px; }
   .modal-sub { font-size: 12px; color: #6B7280; margin-bottom: 1rem; }
   .preview-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F3F4F6; font-size: 13px; }
@@ -266,31 +266,21 @@
   <!-- === 미리보기 모달 === -->
   <div class="modal-overlay" id="previewModal">
     <div class="modal-box">
-      <div class="modal-title">생성 설정 확인</div>
-      <div class="modal-sub">아래 조건으로 문제가 생성됩니다. 확인 후 생성을 시작하세요.</div>
+      <div class="modal-title">문제 미리보기</div>
+      <div class="modal-sub" id="prevSummaryLine">선택 문항 - · 배수 - · 난이도 - · 유형 -</div>
 
-      <div class="preview-row">
-        <span class="k">선택 문항</span>
-        <span class="v" id="prevItems">-</span>
-      </div>
-      <div class="preview-row">
-        <span class="k">문항 배수</span>
-        <span class="v" id="prevMult">-</span>
-      </div>
-      <div class="preview-row">
-        <span class="k">난이도</span>
-        <span class="v" id="prevDiff">-</span>
-      </div>
-      <div class="preview-row">
-        <span class="k">선택 유형</span>
-        <div class="v preview-chip-wrap" id="prevTypes"></div>
+      <div id="prevLoadingArea" style="display:none">
+        <div class="progress" style="display:block"><div class="progress-bar" id="prevProgBar" style="width:30%"></div></div>
+        <div class="status-msg">샘플 문제 1개를 생성하는 중...</div>
       </div>
 
-      <div class="preview-total" id="prevTotal">예상 생성 문제 수: -</div>
+      <div id="prevQuestionArea"></div>
+
+      <div class="err-box" id="prevErrBox"></div>
 
       <div class="modal-btns">
         <button class="modal-btn-cancel" onclick="closePreview()">다시 설정</button>
-        <button class="modal-btn-confirm" id="confirmGenBtn">이대로 생성하기</button>
+        <button class="modal-btn-confirm" id="confirmGenBtn">좋아요, 전체 생성하기</button>
       </div>
     </div>
   </div>
@@ -709,8 +699,8 @@ diffSlider.addEventListener('input', () => {
 
 // (유형 클릭 이벤트는 renderTypeGroups() 안에서 동적으로 등록됨)
 
-// === 미리보기 모달 로직 ===
-document.getElementById('previewBtn').addEventListener('click', () => {
+// === 미리보기 모달 로직 (실제 1문제 생성) ===
+document.getElementById('previewBtn').addEventListener('click', async () => {
   const selectedNumbers = [...document.querySelectorAll('#itemList input[type=checkbox]:checked')]
     .map(cb => parseInt(cb.dataset.number));
   const selectedTypes = [...document.querySelectorAll('.type-opt.on')].map(o => o.dataset.type);
@@ -731,23 +721,40 @@ document.getElementById('previewBtn').addEventListener('click', () => {
   const diffMap = { '-1': '낮춤 (더 쉽게)', '0': '원본과 동일', '1': '높임 (더 어렵게)' };
   const diffLabel = diffMap[diffSlider.value];
 
-  document.getElementById('prevItems').textContent = selectedNumbers.join(', ') + '번 (' + selectedNumbers.length + '개)';
-  document.getElementById('prevMult').textContent = mult + '배';
-  document.getElementById('prevDiff').textContent = diffLabel;
+  document.getElementById('prevSummaryLine').textContent =
+    `선택 문항 ${selectedNumbers.join(', ')}번 (${selectedNumbers.length}개) · 배수 ${mult}배 · 난이도 ${diffLabel} · 유형 ${selectedTypes.length}개 선택됨 — 예상 약 ${selectedNumbers.length * mult}개 생성`;
 
-  const chipWrap = document.getElementById('prevTypes');
-  chipWrap.innerHTML = '';
-  selectedTypes.forEach(t => {
-    const chip = document.createElement('span');
-    chip.className = 'preview-chip';
-    chip.textContent = t;
-    chipWrap.appendChild(chip);
-  });
-
-  document.getElementById('prevTotal').textContent =
-    `예상 생성 문제 수: 약 ${selectedNumbers.length * mult}개`;
-
+  document.getElementById('prevQuestionArea').innerHTML = '';
+  document.getElementById('prevErrBox').style.display = 'none';
+  document.getElementById('confirmGenBtn').disabled = false;
   document.getElementById('previewModal').classList.add('show');
+
+  // 첫 선택 문항 + 첫 선택 유형으로 실제 샘플 1개 생성
+  const sourceItem = analyzedItems.find(it => it.number === selectedNumbers[0]) ||
+    { number: selectedNumbers[0], passagePreview: '', wordCount: null };
+  const sampleType = selectedTypes[0];
+
+  document.getElementById('prevLoadingArea').style.display = 'block';
+
+  try {
+    const res = await fetch('/api/regenerate-question', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceItem, type: sampleType, difficulty: diffLabel })
+    });
+    const sampleQ = await res.json();
+    if (!res.ok) throw new Error(sampleQ.error || '샘플 생성 실패');
+
+    document.getElementById('prevLoadingArea').style.display = 'none';
+    const sampleCard = buildQuestionCard(sampleQ, 0);
+    sampleCard.querySelector('.btn-replace')?.remove(); // 미리보기에서는 교체버튼 불필요
+    document.getElementById('prevQuestionArea').appendChild(sampleCard);
+
+  } catch (e) {
+    document.getElementById('prevLoadingArea').style.display = 'none';
+    document.getElementById('prevErrBox').textContent = '미리보기 생성 실패: ' + e.message + ' (그래도 전체 생성은 진행할 수 있어요)';
+    document.getElementById('prevErrBox').style.display = 'block';
+  }
 });
 
 function closePreview() {
