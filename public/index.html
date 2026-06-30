@@ -45,8 +45,9 @@
   .stat { background: #F5F6F8; border-radius: 8px; padding: 12px; text-align: center; }
   .stat .n { font-size: 24px; font-weight: 700; color: #0D2D6B; }
   .stat .t { font-size: 11px; color: #6B7280; margin-top: 2px; }
-  .item-row { border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 10px; }
+  .item-row { border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; }
   .item-row.set-item { border-color: #FDE68A; background: #FFFBEB; }
+  .item-row input[type=checkbox] { margin-top: 4px; width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; }
   .num-badge {
     width: 28px; height: 28px; border-radius: 50%; background: #DBEAFE; color: #1A5CB8;
     font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
@@ -61,6 +62,36 @@
   .tag-blue { background: #DBEAFE; color: #1A5CB8; }
   .tag-warn { background: #FEF3C7; color: #92400E; }
   input[type=file] { display: none; }
+
+  /* === 2단계: 생성 설정 === */
+  .select-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .select-bar .count { font-size: 13px; color: #1A5CB8; font-weight: 600; }
+  .select-bar button { background: none; border: none; color: #6B7280; font-size: 12px; cursor: pointer; text-decoration: underline; }
+  .gen-panel { display: none; }
+  .gen-row { margin-bottom: 14px; }
+  .gen-row label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; }
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  .slider-row input[type=range] { flex: 1; }
+  .slider-row .val { font-size: 14px; font-weight: 700; color: #1A5CB8; min-width: 36px; text-align: right; }
+  .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .type-opt {
+    border: 1px solid #E5E7EB; border-radius: 8px; padding: 9px 12px; cursor: pointer;
+    font-size: 13px; color: #374151; transition: all .15s; user-select: none;
+  }
+  .type-opt:hover { border-color: #1A5CB8; }
+  .type-opt.on { border-color: #1A5CB8; background: #EFF6FF; color: #1A5CB8; font-weight: 600; }
+  .btn-gen {
+    width: 100%; padding: 12px; border-radius: 8px; background: #0D2D6B; color: #fff;
+    border: none; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px;
+  }
+  .btn-gen:hover { background: #082050; }
+  .btn-gen:disabled { opacity: .4; cursor: not-allowed; }
+  .gen-result { display: none; margin-top: 1.5rem; }
+  .gen-q-card { border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; background: #fff; }
+  .gen-q-head { font-size: 12px; color: #1A5CB8; font-weight: 700; margin-bottom: 6px; }
+  .gen-q-text { font-size: 13px; line-height: 1.6; margin-bottom: 8px; }
+  .gen-q-opts { font-size: 13px; color: #374151; line-height: 1.9; }
+  .gen-q-answer { font-size: 12px; color: #047857; margin-top: 8px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -93,12 +124,66 @@
       <div class="stat"><div class="n" id="statSets">-</div><div class="t">다문항 세트</div></div>
       <div class="stat"><div class="n" id="statWords">-</div><div class="t">평균 단어수</div></div>
     </div>
+
+    <div class="select-bar">
+      <span class="count" id="selCount">0개 선택됨</span>
+      <button onclick="toggleAll()">전체 선택/해제</button>
+    </div>
+
     <div id="itemList"></div>
+
+    <button class="btn-go" id="toGenBtn" style="margin-top:1rem" disabled onclick="openGenPanel()">선택한 문항으로 문제 생성 설정 →</button>
   </div>
+
+  <!-- === 2단계: 생성 설정 패널 === -->
+  <div class="card gen-panel" id="genPanel">
+    <div class="label">문제 생성 설정</div>
+
+    <div class="gen-row">
+      <label>문항 배수 (선택 문항당 생성할 문제 수)</label>
+      <div class="slider-row">
+        <input type="range" id="multSlider" min="1" max="5" value="2" step="1">
+        <span class="val" id="multVal">2배</span>
+      </div>
+    </div>
+
+    <div class="gen-row">
+      <label>난이도 조정</label>
+      <div class="slider-row">
+        <input type="range" id="diffSlider" min="-1" max="1" value="0" step="1">
+        <span class="val" id="diffVal" style="font-size:12px">원본</span>
+      </div>
+    </div>
+
+    <div class="gen-row">
+      <label>문제 유형 (복수 선택 가능)</label>
+      <div class="type-grid" id="typeGrid">
+        <div class="type-opt on" data-type="어휘·동의어">어휘·동의어</div>
+        <div class="type-opt on" data-type="빈칸 완성">빈칸 완성</div>
+        <div class="type-opt" data-type="내용 일치">내용 일치</div>
+        <div class="type-opt" data-type="순서 배열">순서 배열</div>
+        <div class="type-opt" data-type="주제 추론">주제 추론</div>
+        <div class="type-opt" data-type="문장 삽입">문장 삽입</div>
+      </div>
+    </div>
+
+    <button class="btn-gen" id="genBtn">문제 생성하기</button>
+    <div class="progress" id="genProg"><div class="progress-bar" id="genProgBar"></div></div>
+    <div class="status-msg" id="genStatusMsg"></div>
+    <div class="err-box" id="genErrBox"></div>
+  </div>
+
+  <div class="gen-result" id="genResult">
+    <div class="label">생성된 문제</div>
+    <div id="genQList"></div>
+  </div>
+
 </div>
 
 <script>
 let pdfFile = null;
+let analyzedItems = [];
+let analyzedSets = [];
 const dropzone = document.getElementById('dropzone');
 const fi = document.getElementById('fi');
 const goBtn = document.getElementById('goBtn');
@@ -186,23 +271,29 @@ goBtn.addEventListener('click', async () => {
 });
 
 function renderResult(data) {
-  const items = data.items || [];
-  const sets = data.sets || [];
+  analyzedItems = data.items || [];
+  analyzedSets = data.sets || [];
   const setMap = {};
-  sets.forEach(s => s.numbers.forEach(n => setMap[n] = s));
+  analyzedSets.forEach(s => s.numbers.forEach(n => setMap[n] = s));
 
-  document.getElementById('statItems').textContent = items.length;
-  document.getElementById('statSets').textContent = sets.length;
-  const avg = items.length ? Math.round(items.reduce((a,i) => a + (i.wordCount||0), 0) / items.length) : 0;
+  document.getElementById('statItems').textContent = analyzedItems.length;
+  document.getElementById('statSets').textContent = analyzedSets.length;
+  const avg = analyzedItems.length ? Math.round(analyzedItems.reduce((a,i) => a + (i.wordCount||0), 0) / analyzedItems.length) : 0;
   document.getElementById('statWords').textContent = avg;
 
   const list = document.getElementById('itemList');
   list.innerHTML = '';
 
-  items.forEach(item => {
+  analyzedItems.forEach(item => {
     const inSet = setMap[item.number];
     const div = document.createElement('div');
     div.className = 'item-row' + (inSet ? ' set-item' : '');
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    checkbox.dataset.number = item.number;
+    checkbox.addEventListener('change', updateSelCount);
 
     const badge = document.createElement('div');
     badge.className = 'num-badge' + (inSet ? ' warn' : '');
@@ -233,12 +324,139 @@ function renderResult(data) {
       body.appendChild(prev);
     }
 
+    div.appendChild(checkbox);
     div.appendChild(badge);
     div.appendChild(body);
     list.appendChild(div);
   });
 
   document.getElementById('resultWrap').style.display = 'block';
+  updateSelCount();
+}
+
+function updateSelCount() {
+  const checked = document.querySelectorAll('#itemList input[type=checkbox]:checked');
+  document.getElementById('selCount').textContent = checked.length + '개 선택됨';
+  document.getElementById('toGenBtn').disabled = checked.length === 0;
+}
+
+function toggleAll() {
+  const boxes = document.querySelectorAll('#itemList input[type=checkbox]');
+  const allChecked = [...boxes].every(b => b.checked);
+  boxes.forEach(b => b.checked = !allChecked);
+  updateSelCount();
+}
+
+function openGenPanel() {
+  document.getElementById('genPanel').style.display = 'block';
+  document.getElementById('genPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// === 2단계: 생성 설정 인터랙션 ===
+const multSlider = document.getElementById('multSlider');
+multSlider.addEventListener('input', () => {
+  document.getElementById('multVal').textContent = multSlider.value + '배';
+});
+
+const diffSlider = document.getElementById('diffSlider');
+diffSlider.addEventListener('input', () => {
+  const m = { '-1': '난이도 낮춤', '0': '원본', '1': '난이도 높임' };
+  document.getElementById('diffVal').textContent = m[diffSlider.value];
+});
+
+document.querySelectorAll('.type-opt').forEach(opt => {
+  opt.addEventListener('click', () => opt.classList.toggle('on'));
+});
+
+document.getElementById('genBtn').addEventListener('click', async () => {
+  const selectedNumbers = [...document.querySelectorAll('#itemList input[type=checkbox]:checked')]
+    .map(cb => parseInt(cb.dataset.number));
+  const selectedItems = analyzedItems.filter(it => selectedNumbers.includes(it.number));
+
+  const selectedTypes = [...document.querySelectorAll('.type-opt.on')].map(o => o.dataset.type);
+  if (selectedTypes.length === 0) {
+    document.getElementById('genErrBox').textContent = '문제 유형을 최소 1개 선택해주세요';
+    document.getElementById('genErrBox').style.display = 'block';
+    return;
+  }
+
+  const mult = parseInt(multSlider.value);
+  const diffMap = { '-1': '낮춤 (더 쉽게)', '0': '원본과 동일', '1': '높임 (더 어렵게)' };
+  const diffLabel = diffMap[diffSlider.value];
+
+  document.getElementById('genErrBox').style.display = 'none';
+  document.getElementById('genResult').style.display = 'none';
+  document.getElementById('genBtn').disabled = true;
+  document.getElementById('genProg').style.display = 'block';
+  document.getElementById('genProgBar').style.width = '20%';
+  document.getElementById('genStatusMsg').textContent = '문제 생성 중...';
+
+  try {
+    const res = await fetch('/api/generate-questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: selectedItems,
+        multiplier: mult,
+        difficulty: diffLabel,
+        types: selectedTypes
+      })
+    });
+
+    document.getElementById('genProgBar').style.width = '75%';
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '생성 실패');
+
+    document.getElementById('genProgBar').style.width = '100%';
+    document.getElementById('genStatusMsg').textContent = '생성 완료!';
+    renderGenResult(data);
+
+  } catch (e) {
+    document.getElementById('genProg').style.display = 'none';
+    document.getElementById('genStatusMsg').textContent = '';
+    document.getElementById('genErrBox').textContent = '오류: ' + e.message;
+    document.getElementById('genErrBox').style.display = 'block';
+  } finally {
+    document.getElementById('genBtn').disabled = false;
+  }
+});
+
+function renderGenResult(data) {
+  const questions = data.questions || [];
+  const list = document.getElementById('genQList');
+  list.innerHTML = '';
+
+  questions.forEach((q, idx) => {
+    const card = document.createElement('div');
+    card.className = 'gen-q-card';
+
+    const head = document.createElement('div');
+    head.className = 'gen-q-head';
+    head.textContent = '[원문 ' + q.sourceNumber + '번 기반] ' + q.type + ' · 문제 ' + (idx + 1);
+
+    const text = document.createElement('div');
+    text.className = 'gen-q-text';
+    text.textContent = q.question;
+
+    const opts = document.createElement('div');
+    opts.className = 'gen-q-opts';
+    if (Array.isArray(q.options)) {
+      opts.innerHTML = q.options.map((o, i) => `${i+1}. ${o}`).join('<br>');
+    }
+
+    const answer = document.createElement('div');
+    answer.className = 'gen-q-answer';
+    answer.textContent = '정답: ' + q.answer + (q.explanation ? ' · ' + q.explanation : '');
+
+    card.appendChild(head);
+    card.appendChild(text);
+    card.appendChild(opts);
+    card.appendChild(answer);
+    list.appendChild(card);
+  });
+
+  document.getElementById('genResult').style.display = 'block';
+  document.getElementById('genResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 </script>
 </body>
