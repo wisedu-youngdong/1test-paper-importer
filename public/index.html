@@ -113,8 +113,11 @@
     font-size: 11.5px; color: #374151; line-height: 1.55; margin-bottom: 8px;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
-  .item-card2-stats { font-size: 10.5px; color: #6B7280; font-weight: 500; }
-  .item-card2-err { font-size: 10.5px; color: #6B7280; font-weight: 500; margin-top: 2px; }
+  .item-card2-stats-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+  .item-card2-pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; }
+  .pill-lexile { background: #EFF6FF; color: #1A5CB8; }
+  .pill-ar { background: #F0FDF4; color: #15803D; }
+  .pill-err { background: #FEF2F2; color: #B91C1C; }
 
   .passage-modal-body {
     font-size: 13px; line-height: 1.85; color: #374151; margin: 1rem 0;
@@ -841,24 +844,37 @@ function renderResult(data) {
       passageBox.textContent = '"' + stripHtmlTags(item.passagePreview) + ' ..."';
     }
 
-    // Lexile / AR / 오답률
-    const statsLine = document.createElement('div');
-    statsLine.className = 'item-card2-stats';
-    const lexileText = item.lexile ? `Lexile ${item.lexile}` : '';
-    const arText = item.ar ? `AR ${item.ar}` : '';
-    const errText = item.errorRate ? `오답률 ${item.errorRate}` : '';
-    statsLine.textContent = [lexileText, arText].filter(Boolean).join(' · ');
+    // Lexile / AR / 오답률 — 알약(pill) 배지 형태
+    const statsRow = document.createElement('div');
+    statsRow.className = 'item-card2-stats-row';
+    if (item.lexile) {
+      const lexilePill = document.createElement('span');
+      lexilePill.className = 'item-card2-pill pill-lexile';
+      lexilePill.textContent = 'Lexile ' + item.lexile;
+      statsRow.appendChild(lexilePill);
+    }
+    if (item.ar) {
+      const arPill = document.createElement('span');
+      arPill.className = 'item-card2-pill pill-ar';
+      arPill.textContent = 'AR ' + item.ar;
+      statsRow.appendChild(arPill);
+    }
 
-    const errLine = document.createElement('div');
-    errLine.className = 'item-card2-err';
-    errLine.textContent = errText;
+    const errRow = document.createElement('div');
+    errRow.className = 'item-card2-stats-row';
+    if (item.errorRate) {
+      const errPill = document.createElement('span');
+      errPill.className = 'item-card2-pill pill-err';
+      errPill.textContent = '오답률 ' + item.errorRate;
+      errRow.appendChild(errPill);
+    }
 
     card.appendChild(checkRow);
     card.appendChild(titleLine);
     card.appendChild(subLine);
     card.appendChild(passageBox);
-    if (statsLine.textContent) card.appendChild(statsLine);
-    if (errText) card.appendChild(errLine);
+    if (statsRow.children.length) card.appendChild(statsRow);
+    if (errRow.children.length) card.appendChild(errRow);
 
     // 카드 클릭 시 전체 지문 모달
     card.addEventListener('click', () => openPassageModal(item, inSet));
