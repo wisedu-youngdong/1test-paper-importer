@@ -58,7 +58,7 @@ sets가 없으면 빈 배열 []로 하세요.`;
               { text: prompt }
             ]
           }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+          generationConfig: { temperature: 0.1, maxOutputTokens: 16384 }
         })
       }
     );
