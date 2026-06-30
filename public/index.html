@@ -136,12 +136,44 @@
   .btn-replace:hover { border-color: #1A5CB8; color: #1A5CB8; }
   .btn-replace:disabled { opacity: .5; cursor: wait; }
   .gen-q-card.replacing { opacity: .5; pointer-events: none; }
+
+  /* === 저장 기능 === */
+  .save-bar { margin-bottom: 1.25rem; }
+  .save-row { display: flex; gap: 8px; }
+  .save-row input[type=text] { flex: 1; padding: 9px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 13px; }
+  .btn-save { padding: 9px 18px; border-radius: 6px; background: #1A5CB8; color: #fff; border: none; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .btn-save:hover { background: #0D2D6B; }
+  .btn-save:disabled { opacity: .5; cursor: not-allowed; }
+  .save-msg { font-size: 12px; color: #047857; margin-top: 6px; min-height: 16px; }
+
+  .saved-set-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #E5E7EB;
+    border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: background .15s;
+  }
+  .saved-set-row:hover { background: #F9FAFB; }
+  .saved-set-icon { font-size: 18px; flex-shrink: 0; }
+  .saved-set-info { flex: 1; min-width: 0; }
+  .saved-set-name { font-size: 13px; font-weight: 600; color: #1A1A1A; }
+  .saved-set-meta { font-size: 11px; color: #6B7280; margin-top: 2px; }
+  .saved-set-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .saved-set-actions button {
+    font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid #D1D5DB;
+    background: #fff; color: #374151; cursor: pointer;
+  }
+  .saved-set-actions button:hover { border-color: #1A5CB8; color: #1A5CB8; }
+  .saved-set-actions .del-btn:hover { border-color: #DC2626; color: #DC2626; }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>1test 시험지 문항 분석기</h1>
   <p class="subtitle">수능/모의고사 PDF를 업로드하면 문항 구조를 자동으로 분석합니다</p>
+
+  <!-- === 저장된 세트 목록 (페이지 진입 시 항상 표시) === -->
+  <div class="card" id="savedSetsCard" style="display:none">
+    <div class="label">저장된 문제 세트</div>
+    <div id="savedSetsList"></div>
+  </div>
 
   <div class="drop" id="dropzone" onclick="document.getElementById('fi').click()">
     <div class="main">클릭 또는 드래그로 PDF 업로드</div>
@@ -249,6 +281,15 @@
   </div>
 
   <div class="gen-result" id="genResult">
+    <div class="save-bar card">
+      <div class="label" style="margin-bottom:8px">이 문제 세트 저장하기</div>
+      <div class="save-row">
+        <input type="text" id="setNameInput" placeholder="예: 양영중 3-1 기말 변형문제">
+        <button class="btn-save" id="saveSetBtn">저장</button>
+      </div>
+      <div class="save-msg" id="saveMsg"></div>
+    </div>
+
     <div class="label">생성된 문제</div>
     <div id="genQList"></div>
   </div>
@@ -317,6 +358,156 @@ function renderTypeGroups() {
   });
 }
 renderTypeGroups();
+
+// =========================================================
+// === localStorage 기반 저장/불러오기 ===
+// =========================================================
+const STORAGE_KEY = '1test_saved_sets';
+const SESSION_KEY = '1test_current_session'; // F5 새로고침 대비 임시 보존
+
+function getSavedSets() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveSavedSets(sets) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sets));
+}
+
+function renderSavedSetsList() {
+  const sets = getSavedSets();
+  const card = document.getElementById('savedSetsCard');
+  const list = document.getElementById('savedSetsList');
+
+  if (sets.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+  list.innerHTML = '';
+
+  sets.slice().reverse().forEach(set => {
+    const row = document.createElement('div');
+    row.className = 'saved-set-row';
+
+    const icon = document.createElement('div');
+    icon.className = 'saved-set-icon';
+    icon.textContent = '📄';
+
+    const info = document.createElement('div');
+    info.className = 'saved-set-info';
+    const name = document.createElement('div');
+    name.className = 'saved-set-name';
+    name.textContent = set.name;
+    const meta = document.createElement('div');
+    meta.className = 'saved-set-meta';
+    const date = new Date(set.savedAt);
+    meta.textContent = `문제 ${set.questions.length}개 · ${date.toLocaleDateString('ko-KR')} ${date.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'})}`;
+    info.appendChild(name);
+    info.appendChild(meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'saved-set-actions';
+
+    const loadBtn = document.createElement('button');
+    loadBtn.textContent = '불러오기';
+    loadBtn.addEventListener('click', (e) => { e.stopPropagation(); loadSet(set.id); });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'del-btn';
+    delBtn.textContent = '삭제';
+    delBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteSet(set.id); });
+
+    actions.appendChild(loadBtn);
+    actions.appendChild(delBtn);
+
+    row.appendChild(icon);
+    row.appendChild(info);
+    row.appendChild(actions);
+    row.addEventListener('click', () => loadSet(set.id));
+
+    list.appendChild(row);
+  });
+}
+
+function loadSet(id) {
+  const sets = getSavedSets();
+  const set = sets.find(s => s.id === id);
+  if (!set) return;
+
+  analyzedItems = set.analyzedItems || [];
+  analyzedSets = set.analyzedSets || [];
+
+  renderGenResult({ questions: set.questions });
+  document.getElementById('genResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function deleteSet(id) {
+  if (!confirm('이 문제 세트를 삭제할까요?')) return;
+  const sets = getSavedSets().filter(s => s.id !== id);
+  saveSavedSets(sets);
+  renderSavedSetsList();
+}
+
+document.getElementById('saveSetBtn').addEventListener('click', () => {
+  const nameInput = document.getElementById('setNameInput');
+  const name = nameInput.value.trim();
+  if (!name) {
+    nameInput.focus();
+    return;
+  }
+
+  const currentQuestions = [...document.querySelectorAll('.gen-q-card')].map(card => card._qData);
+  if (currentQuestions.length === 0) return;
+
+  const sets = getSavedSets();
+  sets.push({
+    id: 'set_' + Date.now(),
+    name,
+    questions: currentQuestions,
+    analyzedItems,
+    analyzedSets,
+    savedAt: new Date().toISOString()
+  });
+  saveSavedSets(sets);
+  renderSavedSetsList();
+
+  document.getElementById('saveMsg').textContent = `"${name}" 저장 완료!`;
+  nameInput.value = '';
+  setTimeout(() => { document.getElementById('saveMsg').textContent = ''; }, 3000);
+});
+
+// === F5 새로고침 대비: 현재 작업 세션 자동 보존 ===
+function persistSession() {
+  const currentQuestions = [...document.querySelectorAll('.gen-q-card')].map(card => card._qData);
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+    analyzedItems, analyzedSets,
+    questions: currentQuestions
+  }));
+}
+
+function restoreSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.analyzedItems && data.analyzedItems.length) {
+      analyzedItems = data.analyzedItems;
+      analyzedSets = data.analyzedSets || [];
+      renderResult({ items: analyzedItems, sets: analyzedSets });
+    }
+    if (data.questions && data.questions.length) {
+      renderGenResult({ questions: data.questions });
+      document.getElementById('genPanel').style.display = 'block';
+    }
+  } catch (e) { /* 무시 */ }
+}
+
+renderSavedSetsList();
+restoreSession();
 
 dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
 dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
@@ -468,6 +659,7 @@ function renderResult(data) {
 
   document.getElementById('resultWrap').style.display = 'block';
   updateSelCount();
+  persistSession();
 }
 
 function updateSelCount() {
@@ -611,6 +803,7 @@ function renderGenResult(data) {
 
   document.getElementById('genResult').style.display = 'block';
   document.getElementById('genResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  persistSession();
 }
 
 function buildQuestionCard(q, idx) {
@@ -685,6 +878,7 @@ async function regenerateOne(cardEl, currentQ) {
     const idx = parseInt(cardEl.dataset.idx);
     const newCard = buildQuestionCard(newQ, idx);
     cardEl.replaceWith(newCard);
+    persistSession();
 
   } catch (e) {
     btn.disabled = false;
