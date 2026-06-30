@@ -710,7 +710,7 @@ const LEVEL_COLORS = {
 };
 
 function renderResult(data) {
-  analyzedItems = data.items || [];
+  analyzedItems = (data.items || []).slice().sort((a, b) => a.number - b.number);
   analyzedSets = data.sets || [];
   const setMap = {};
   analyzedSets.forEach(s => s.numbers.forEach(n => setMap[n] = s));
