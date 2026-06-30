@@ -141,6 +141,16 @@
   .modal-btn-confirm { background: #0D2D6B; color: #fff; }
   .modal-btn-confirm:hover { background: #082050; }
 
+  .prev-tab-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem; }
+  .prev-tab {
+    font-size: 12px; padding: 6px 12px; border-radius: 20px; border: 1px solid #D1D5DB;
+    background: #fff; color: #6B7280; cursor: pointer; transition: all .15s; position: relative;
+  }
+  .prev-tab:hover { border-color: #1A5CB8; color: #1A5CB8; }
+  .prev-tab.active { border-color: #1A5CB8; background: #1A5CB8; color: #fff; font-weight: 600; }
+  .prev-tab.cached::after { content: '✓'; margin-left: 4px; font-size: 10px; }
+  .prev-tab.loading { opacity: .6; cursor: wait; }
+
   /* === 교체 버튼 === */
   .gen-q-card { position: relative; }
   .gen-q-head-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
@@ -268,6 +278,8 @@
     <div class="modal-box">
       <div class="modal-title">문제 미리보기</div>
       <div class="modal-sub" id="prevSummaryLine">선택 문항 - · 배수 - · 난이도 - · 유형 -</div>
+
+      <div class="prev-tab-row" id="prevTabRow"></div>
 
       <div id="prevLoadingArea" style="display:none">
         <div class="progress" style="display:block"><div class="progress-bar" id="prevProgBar" style="width:30%"></div></div>
@@ -699,7 +711,11 @@ diffSlider.addEventListener('input', () => {
 
 // (유형 클릭 이벤트는 renderTypeGroups() 안에서 동적으로 등록됨)
 
-// === 미리보기 모달 로직 (실제 1문제 생성) ===
+// === 미리보기 모달 로직 (유형별 탭 + 캐싱) ===
+let previewCache = {}; // { 유형명: 생성된문제객체 }
+let previewSourceItem = null;
+let previewDiffLabel = '';
+
 document.getElementById('previewBtn').addEventListener('click', async () => {
   const selectedNumbers = [...document.querySelectorAll('#itemList input[type=checkbox]:checked')]
     .map(cb => parseInt(cb.dataset.number));
@@ -719,43 +735,90 @@ document.getElementById('previewBtn').addEventListener('click', async () => {
 
   const mult = parseInt(multSlider.value);
   const diffMap = { '-1': '낮춤 (더 쉽게)', '0': '원본과 동일', '1': '높임 (더 어렵게)' };
-  const diffLabel = diffMap[diffSlider.value];
+  previewDiffLabel = diffMap[diffSlider.value];
+  previewSourceItem = analyzedItems.find(it => it.number === selectedNumbers[0]) ||
+    { number: selectedNumbers[0], passagePreview: '', wordCount: null };
 
   document.getElementById('prevSummaryLine').textContent =
-    `선택 문항 ${selectedNumbers.join(', ')}번 (${selectedNumbers.length}개) · 배수 ${mult}배 · 난이도 ${diffLabel} · 유형 ${selectedTypes.length}개 선택됨 — 예상 약 ${selectedNumbers.length * mult}개 생성`;
+    `선택 문항 ${selectedNumbers.join(', ')}번 (${selectedNumbers.length}개) · 배수 ${mult}배 · 난이도 ${previewDiffLabel} · 유형 ${selectedTypes.length}개 선택됨 — 예상 약 ${selectedNumbers.length * mult}개 생성`;
 
+  // 새로 미리보기 열 때마다 캐시 초기화 (설정이 바뀌었을 수 있으므로)
+  previewCache = {};
   document.getElementById('prevQuestionArea').innerHTML = '';
   document.getElementById('prevErrBox').style.display = 'none';
   document.getElementById('confirmGenBtn').disabled = false;
+
+  renderPreviewTabs(selectedTypes);
   document.getElementById('previewModal').classList.add('show');
 
-  // 첫 선택 문항 + 첫 선택 유형으로 실제 샘플 1개 생성
-  const sourceItem = analyzedItems.find(it => it.number === selectedNumbers[0]) ||
-    { number: selectedNumbers[0], passagePreview: '', wordCount: null };
-  const sampleType = selectedTypes[0];
+  // 첫 번째 유형 탭 자동 클릭
+  loadPreviewTab(selectedTypes[0]);
+});
 
+function renderPreviewTabs(types) {
+  const row = document.getElementById('prevTabRow');
+  row.innerHTML = '';
+  types.forEach(t => {
+    const tab = document.createElement('button');
+    tab.className = 'prev-tab';
+    tab.textContent = t;
+    tab.dataset.type = t;
+    tab.addEventListener('click', () => loadPreviewTab(t));
+    row.appendChild(tab);
+  });
+}
+
+function setActiveTab(type) {
+  document.querySelectorAll('.prev-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.type === type);
+    if (previewCache[tab.dataset.type]) tab.classList.add('cached');
+  });
+}
+
+async function loadPreviewTab(type) {
+  setActiveTab(type);
+  document.getElementById('prevErrBox').style.display = 'none';
+
+  // 캐시에 있으면 API 호출 없이 바로 보여줌
+  if (previewCache[type]) {
+    showPreviewQuestion(previewCache[type]);
+    return;
+  }
+
+  const tabEl = document.querySelector(`.prev-tab[data-type="${type}"]`);
+  tabEl?.classList.add('loading');
   document.getElementById('prevLoadingArea').style.display = 'block';
+  document.getElementById('prevQuestionArea').innerHTML = '';
 
   try {
     const res = await fetch('/api/regenerate-question', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sourceItem, type: sampleType, difficulty: diffLabel })
+      body: JSON.stringify({ sourceItem: previewSourceItem, type, difficulty: previewDiffLabel })
     });
     const sampleQ = await res.json();
     if (!res.ok) throw new Error(sampleQ.error || '샘플 생성 실패');
 
+    previewCache[type] = sampleQ; // 캐시 저장 — 이후 같은 탭은 재호출 안 함
     document.getElementById('prevLoadingArea').style.display = 'none';
-    const sampleCard = buildQuestionCard(sampleQ, 0);
-    sampleCard.querySelector('.btn-replace')?.remove(); // 미리보기에서는 교체버튼 불필요
-    document.getElementById('prevQuestionArea').appendChild(sampleCard);
+    tabEl?.classList.remove('loading');
+    tabEl?.classList.add('cached');
+    showPreviewQuestion(sampleQ);
 
   } catch (e) {
     document.getElementById('prevLoadingArea').style.display = 'none';
-    document.getElementById('prevErrBox').textContent = '미리보기 생성 실패: ' + e.message + ' (그래도 전체 생성은 진행할 수 있어요)';
+    tabEl?.classList.remove('loading');
+    document.getElementById('prevErrBox').textContent = `"${type}" 미리보기 생성 실패: ${e.message}`;
     document.getElementById('prevErrBox').style.display = 'block';
   }
-});
+}
+
+function showPreviewQuestion(q) {
+  document.getElementById('prevQuestionArea').innerHTML = '';
+  const sampleCard = buildQuestionCard(q, 0);
+  sampleCard.querySelector('.btn-replace')?.remove(); // 미리보기에서는 교체버튼 불필요
+  document.getElementById('prevQuestionArea').appendChild(sampleCard);
+}
 
 function closePreview() {
   document.getElementById('previewModal').classList.remove('show');
