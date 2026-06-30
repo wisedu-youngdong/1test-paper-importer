@@ -103,6 +103,39 @@
   .gen-q-text { font-size: 13px; line-height: 1.6; margin-bottom: 8px; }
   .gen-q-opts { font-size: 13px; color: #374151; line-height: 1.9; }
   .gen-q-answer { font-size: 12px; color: #047857; margin-top: 8px; font-weight: 600; }
+
+  /* === 미리보기 모달 === */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    align-items: center; justify-content: center; z-index: 50; padding: 1rem;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box { background: #fff; border-radius: 12px; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 1.5rem; }
+  .modal-title { font-size: 16px; font-weight: 700; color: #0D2D6B; margin-bottom: 4px; }
+  .modal-sub { font-size: 12px; color: #6B7280; margin-bottom: 1rem; }
+  .preview-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F3F4F6; font-size: 13px; }
+  .preview-row .k { color: #6B7280; }
+  .preview-row .v { font-weight: 600; color: #1A1A1A; text-align: right; max-width: 60%; }
+  .preview-chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .preview-chip { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: #EFF6FF; color: #1A5CB8; font-weight: 600; }
+  .preview-total { background: #F0F7FF; border-radius: 8px; padding: 10px 14px; margin-top: 12px; font-size: 13px; font-weight: 700; color: #0D2D6B; text-align: center; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 1.25rem; }
+  .modal-btns button { flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+  .modal-btn-cancel { background: #F3F4F6; color: #374151; }
+  .modal-btn-cancel:hover { background: #E5E7EB; }
+  .modal-btn-confirm { background: #0D2D6B; color: #fff; }
+  .modal-btn-confirm:hover { background: #082050; }
+
+  /* === 교체 버튼 === */
+  .gen-q-card { position: relative; }
+  .gen-q-head-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .btn-replace {
+    font-size: 11px; padding: 4px 10px; border-radius: 20px; border: 1px solid #D1D5DB;
+    background: #fff; color: #6B7280; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+  }
+  .btn-replace:hover { border-color: #1A5CB8; color: #1A5CB8; }
+  .btn-replace:disabled { opacity: .5; cursor: wait; }
+  .gen-q-card.replacing { opacity: .5; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -174,12 +207,44 @@
           </div>
         </div>
 
-        <button class="btn-gen" id="genBtn">문제 생성하기</button>
+        <button class="btn-gen" id="previewBtn">생성 전 미리보기</button>
         <div class="progress" id="genProg"><div class="progress-bar" id="genProgBar"></div></div>
         <div class="status-msg" id="genStatusMsg"></div>
         <div class="err-box" id="genErrBox"></div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- === 미리보기 모달 === -->
+  <div class="modal-overlay" id="previewModal">
+    <div class="modal-box">
+      <div class="modal-title">생성 설정 확인</div>
+      <div class="modal-sub">아래 조건으로 문제가 생성됩니다. 확인 후 생성을 시작하세요.</div>
+
+      <div class="preview-row">
+        <span class="k">선택 문항</span>
+        <span class="v" id="prevItems">-</span>
+      </div>
+      <div class="preview-row">
+        <span class="k">문항 배수</span>
+        <span class="v" id="prevMult">-</span>
+      </div>
+      <div class="preview-row">
+        <span class="k">난이도</span>
+        <span class="v" id="prevDiff">-</span>
+      </div>
+      <div class="preview-row">
+        <span class="k">선택 유형</span>
+        <div class="v preview-chip-wrap" id="prevTypes"></div>
+      </div>
+
+      <div class="preview-total" id="prevTotal">예상 생성 문제 수: -</div>
+
+      <div class="modal-btns">
+        <button class="modal-btn-cancel" onclick="closePreview()">다시 설정</button>
+        <button class="modal-btn-confirm" id="confirmGenBtn">이대로 생성하기</button>
+      </div>
     </div>
   </div>
 
@@ -437,17 +502,61 @@ diffSlider.addEventListener('input', () => {
 
 // (유형 클릭 이벤트는 renderTypeGroups() 안에서 동적으로 등록됨)
 
-document.getElementById('genBtn').addEventListener('click', async () => {
+// === 미리보기 모달 로직 ===
+document.getElementById('previewBtn').addEventListener('click', () => {
   const selectedNumbers = [...document.querySelectorAll('#itemList input[type=checkbox]:checked')]
     .map(cb => parseInt(cb.dataset.number));
-  const selectedItems = analyzedItems.filter(it => selectedNumbers.includes(it.number));
-
   const selectedTypes = [...document.querySelectorAll('.type-opt.on')].map(o => o.dataset.type);
+
+  if (selectedNumbers.length === 0) {
+    document.getElementById('genErrBox').textContent = '먼저 분석 결과에서 문항을 선택해주세요';
+    document.getElementById('genErrBox').style.display = 'block';
+    return;
+  }
   if (selectedTypes.length === 0) {
     document.getElementById('genErrBox').textContent = '문제 유형을 최소 1개 선택해주세요';
     document.getElementById('genErrBox').style.display = 'block';
     return;
   }
+  document.getElementById('genErrBox').style.display = 'none';
+
+  const mult = parseInt(multSlider.value);
+  const diffMap = { '-1': '낮춤 (더 쉽게)', '0': '원본과 동일', '1': '높임 (더 어렵게)' };
+  const diffLabel = diffMap[diffSlider.value];
+
+  document.getElementById('prevItems').textContent = selectedNumbers.join(', ') + '번 (' + selectedNumbers.length + '개)';
+  document.getElementById('prevMult').textContent = mult + '배';
+  document.getElementById('prevDiff').textContent = diffLabel;
+
+  const chipWrap = document.getElementById('prevTypes');
+  chipWrap.innerHTML = '';
+  selectedTypes.forEach(t => {
+    const chip = document.createElement('span');
+    chip.className = 'preview-chip';
+    chip.textContent = t;
+    chipWrap.appendChild(chip);
+  });
+
+  document.getElementById('prevTotal').textContent =
+    `예상 생성 문제 수: 약 ${selectedNumbers.length * mult}개`;
+
+  document.getElementById('previewModal').classList.add('show');
+});
+
+function closePreview() {
+  document.getElementById('previewModal').classList.remove('show');
+}
+
+document.getElementById('confirmGenBtn').addEventListener('click', async () => {
+  closePreview();
+  await runGeneration();
+});
+
+async function runGeneration() {
+  const selectedNumbers = [...document.querySelectorAll('#itemList input[type=checkbox]:checked')]
+    .map(cb => parseInt(cb.dataset.number));
+  const selectedItems = analyzedItems.filter(it => selectedNumbers.includes(it.number));
+  const selectedTypes = [...document.querySelectorAll('.type-opt.on')].map(o => o.dataset.type);
 
   const mult = parseInt(multSlider.value);
   const diffMap = { '-1': '낮춤 (더 쉽게)', '0': '원본과 동일', '1': '높임 (더 어렵게)' };
@@ -455,7 +564,7 @@ document.getElementById('genBtn').addEventListener('click', async () => {
 
   document.getElementById('genErrBox').style.display = 'none';
   document.getElementById('genResult').style.display = 'none';
-  document.getElementById('genBtn').disabled = true;
+  document.getElementById('previewBtn').disabled = true;
   document.getElementById('genProg').style.display = 'block';
   document.getElementById('genProgBar').style.width = '20%';
   document.getElementById('genStatusMsg').textContent = '문제 생성 중...';
@@ -486,9 +595,9 @@ document.getElementById('genBtn').addEventListener('click', async () => {
     document.getElementById('genErrBox').textContent = '오류: ' + e.message;
     document.getElementById('genErrBox').style.display = 'block';
   } finally {
-    document.getElementById('genBtn').disabled = false;
+    document.getElementById('previewBtn').disabled = false;
   }
-});
+}
 
 function renderGenResult(data) {
   const questions = data.questions || [];
@@ -496,36 +605,93 @@ function renderGenResult(data) {
   list.innerHTML = '';
 
   questions.forEach((q, idx) => {
-    const card = document.createElement('div');
-    card.className = 'gen-q-card';
-
-    const head = document.createElement('div');
-    head.className = 'gen-q-head';
-    head.textContent = '[원문 ' + q.sourceNumber + '번 기반] ' + q.type + ' · 문제 ' + (idx + 1);
-
-    const text = document.createElement('div');
-    text.className = 'gen-q-text';
-    text.textContent = q.question;
-
-    const opts = document.createElement('div');
-    opts.className = 'gen-q-opts';
-    if (Array.isArray(q.options)) {
-      opts.innerHTML = q.options.map((o, i) => `${i+1}. ${o}`).join('<br>');
-    }
-
-    const answer = document.createElement('div');
-    answer.className = 'gen-q-answer';
-    answer.textContent = '정답: ' + q.answer + (q.explanation ? ' · ' + q.explanation : '');
-
-    card.appendChild(head);
-    card.appendChild(text);
-    card.appendChild(opts);
-    card.appendChild(answer);
+    const card = buildQuestionCard(q, idx);
     list.appendChild(card);
   });
 
   document.getElementById('genResult').style.display = 'block';
   document.getElementById('genResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function buildQuestionCard(q, idx) {
+  const card = document.createElement('div');
+  card.className = 'gen-q-card';
+  card.dataset.idx = idx;
+
+  const headRow = document.createElement('div');
+  headRow.className = 'gen-q-head-row';
+
+  const head = document.createElement('div');
+  head.className = 'gen-q-head';
+  head.textContent = '[원문 ' + q.sourceNumber + '번 기반] ' + q.type + ' · 문제 ' + (idx + 1);
+
+  const replaceBtn = document.createElement('button');
+  replaceBtn.className = 'btn-replace';
+  replaceBtn.textContent = '🔄 다른 문제로 교체';
+  replaceBtn.addEventListener('click', () => regenerateOne(card, q));
+
+  headRow.appendChild(head);
+  headRow.appendChild(replaceBtn);
+
+  const text = document.createElement('div');
+  text.className = 'gen-q-text';
+  text.textContent = q.question;
+
+  const opts = document.createElement('div');
+  opts.className = 'gen-q-opts';
+  if (Array.isArray(q.options)) {
+    opts.innerHTML = q.options.map((o, i) => `${i+1}. ${o}`).join('<br>');
+  }
+
+  const answer = document.createElement('div');
+  answer.className = 'gen-q-answer';
+  answer.textContent = '정답: ' + q.answer + (q.explanation ? ' · ' + q.explanation : '');
+
+  card.appendChild(headRow);
+  card.appendChild(text);
+  card.appendChild(opts);
+  card.appendChild(answer);
+  card._qData = q; // 현재 카드의 문제 데이터 보관 (재교체 시 avoidQuestion으로 사용)
+  return card;
+}
+
+async function regenerateOne(cardEl, currentQ) {
+  const diffMap = { '-1': '낮춤 (더 쉽게)', '0': '원본과 동일', '1': '높임 (더 어렵게)' };
+  const diffLabel = diffMap[diffSlider.value];
+
+  const sourceItem = analyzedItems.find(it => it.number === currentQ.sourceNumber) || {
+    number: currentQ.sourceNumber, passagePreview: '', wordCount: null
+  };
+
+  cardEl.classList.add('replacing');
+  const btn = cardEl.querySelector('.btn-replace');
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
+
+  try {
+    const res = await fetch('/api/regenerate-question', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sourceItem,
+        type: currentQ.type,
+        difficulty: diffLabel,
+        avoidQuestion: currentQ.question
+      })
+    });
+    const newQ = await res.json();
+    if (!res.ok) throw new Error(newQ.error || '교체 실패');
+
+    const idx = parseInt(cardEl.dataset.idx);
+    const newCard = buildQuestionCard(newQ, idx);
+    cardEl.replaceWith(newCard);
+
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '🔄 다른 문제로 교체';
+    cardEl.classList.remove('replacing');
+    alert('교체 실패: ' + e.message);
+  }
 }
 </script>
 </body>
