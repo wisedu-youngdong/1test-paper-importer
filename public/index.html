@@ -103,6 +103,20 @@
   .gen-q-text { font-size: 13px; line-height: 1.6; margin-bottom: 8px; }
   .gen-q-opts { font-size: 13px; color: #374151; line-height: 1.9; }
   .gen-q-answer { font-size: 12px; color: #047857; margin-top: 8px; font-weight: 600; }
+  .gen-q-question-line { font-size: 13px; font-weight: 700; color: #1A1A1A; margin-bottom: 8px; }
+  .gen-q-content {
+    font-size: 13px; line-height: 1.7; color: #374151; margin-bottom: 10px;
+    background: #F9FAFB; border-radius: 6px; padding: 10px 12px; border-left: 3px solid #1A5CB8;
+  }
+  .gen-q-content u { text-decoration: underline; color: #BE123C; font-weight: 600; }
+  .btn-expl-toggle {
+    font-size: 12px; color: #1A5CB8; background: none; border: none; cursor: pointer;
+    padding: 6px 0; font-weight: 600; text-decoration: underline;
+  }
+  .gen-q-explanation {
+    font-size: 12.5px; line-height: 1.8; color: #374151; margin-top: 8px;
+    background: #FEFCE8; border-radius: 6px; padding: 12px 14px; border: 1px solid #FEF3C7;
+  }
 
   /* === 미리보기 모달 === */
   .modal-overlay {
@@ -816,7 +830,8 @@ function buildQuestionCard(q, idx) {
 
   const head = document.createElement('div');
   head.className = 'gen-q-head';
-  head.textContent = '[원문 ' + q.sourceNumber + '번 기반] ' + q.type + ' · 문제 ' + (idx + 1);
+  const groupLabel = q.mode === 'Composite' ? ` · 다문항 세트(${q.groupSize}문항)` : '';
+  head.textContent = '[원문 ' + q.sourceNumber + '번 기반] ' + q.type + groupLabel + ' · 문제 ' + (idx + 1);
 
   const replaceBtn = document.createElement('button');
   replaceBtn.className = 'btn-replace';
@@ -826,9 +841,15 @@ function buildQuestionCard(q, idx) {
   headRow.appendChild(head);
   headRow.appendChild(replaceBtn);
 
-  const text = document.createElement('div');
-  text.className = 'gen-q-text';
-  text.textContent = q.question;
+  // 문제 지시문
+  const questionLine = document.createElement('div');
+  questionLine.className = 'gen-q-question-line';
+  questionLine.textContent = q.question || '';
+
+  // 지문 본문 (HTML 마커 포함 가능: <br>, <u>, ①②③④⑤ 등)
+  const contentBox = document.createElement('div');
+  contentBox.className = 'gen-q-content';
+  contentBox.innerHTML = q.content || q.question || '';
 
   const opts = document.createElement('div');
   opts.className = 'gen-q-opts';
@@ -838,12 +859,30 @@ function buildQuestionCard(q, idx) {
 
   const answer = document.createElement('div');
   answer.className = 'gen-q-answer';
-  answer.textContent = '정답: ' + q.answer + (q.explanation ? ' · ' + q.explanation : '');
+  answer.innerHTML = '정답: ' + (q.answer || '-');
+
+  const explToggle = document.createElement('button');
+  explToggle.className = 'btn-expl-toggle';
+  explToggle.textContent = '해설 보기 ▾';
+
+  const explBox = document.createElement('div');
+  explBox.className = 'gen-q-explanation';
+  explBox.style.display = 'none';
+  explBox.innerHTML = q.explanation || '해설 없음';
+
+  explToggle.addEventListener('click', () => {
+    const isOpen = explBox.style.display !== 'none';
+    explBox.style.display = isOpen ? 'none' : 'block';
+    explToggle.textContent = isOpen ? '해설 보기 ▾' : '해설 닫기 ▴';
+  });
 
   card.appendChild(headRow);
-  card.appendChild(text);
+  card.appendChild(questionLine);
+  card.appendChild(contentBox);
   card.appendChild(opts);
   card.appendChild(answer);
+  card.appendChild(explToggle);
+  card.appendChild(explBox);
   card._qData = q; // 현재 카드의 문제 데이터 보관 (재교체 시 avoidQuestion으로 사용)
   return card;
 }

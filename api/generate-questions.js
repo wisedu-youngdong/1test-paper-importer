@@ -1,4 +1,4 @@
-import { categoriesPromptBlock } from '../lib/categories.js';
+import { categoriesPromptBlock, typeRulesPromptBlock, EXPLANATION_FORMAT_GUIDE } from '../lib/categories.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,7 +19,10 @@ export default async function handler(req, res) {
     `- ${it.number}번 (원래 유형: ${it.type || '미상'}): "${it.passagePreview || ''} ..." (약 ${it.wordCount || '?'}단어)`
   ).join('\n');
 
-  const prompt = `당신은 한국 수능/모의고사 영어 문제 출제 전문가입니다.
+  const longformTypes = types.filter(t => t.startsWith('장문독해'));
+  const normalTypes = types.filter(t => !t.startsWith('장문독해'));
+
+  const prompt = `당신은 한국 수능/모의고사 영어 문제 출제 전문가이자, 실제 문제은행 플랫폼에 업로드되는 표준 포맷을 정확히 따르는 출제자입니다.
 아래는 원본 시험지에서 선택된 문항들의 지문 정보입니다. 이 지문들을 기반으로 새로운 변형 문제를 생성해주세요.
 
 [선택된 원본 문항]
@@ -29,13 +32,28 @@ ${itemsDesc}
 ${categoriesPromptBlock()}
 (듣기 영역은 제외, 읽기/독해 유형만 사용)
 
+[선택된 유형별 출제 문법 규칙 — 반드시 이 형식을 정확히 지키세요]
+${typeRulesPromptBlock(types)}
+
+[해설 작성 형식 — 반드시 이 HTML 구조를 따르세요]
+${EXPLANATION_FORMAT_GUIDE}
+
 [생성 조건]
 - 각 원본 문항마다 ${multiplier}개씩 새로운 문제를 생성하세요
 - 난이도: ${difficulty}
 - 적용할 문제 유형: ${types.join(', ')} 중에서 다양하게 섞어서 출제하세요 (반드시 위 공식 카테고리 명칭 그대로 사용)
 - 원본 지문의 주제와 어휘 수준을 참고하되, 표현은 새롭게 작성하세요 (원문 그대로 베끼지 마세요)
-- 각 문제는 4지선다 객관식으로 작성하세요 (단, 글의순서배열/문장삽입 유형은 예외적으로 다른 형식 가능)
-- 정답과 함께 한 줄 해설(인과관계 중심)을 포함하세요
+- 빈칸추론은 본문 안에 "__________________"(밑줄 20개)로 빈칸을 표시하세요
+- 무관한문장찾기/문맥속어법(밑줄형)/문맥속어휘(밑줄형)/문장삽입은 본문 안에 ①②③④⑤ 번호를 직접 삽입하세요
+- 글의순서배열/장문독해는 본문 안에 (A)(B)(C)(D) 단락 마커와 <br><br>로 단락을 구분하세요
+- 각 문제는 5지선다 객관식으로 작성하세요 (한국 수능 표준)
+${longformTypes.length > 0 ? `
+[장문독해 특별 규칙]
+- "장문독해(1지문3문항)" 선택 시: (A)(B)(C)(D) 4단락 서사 지문 하나를 만들고, 그 지문 하나로 3문항(순서배열/지칭추론/내용일치)을 세트로 생성하세요
+  - 지칭추론 문제는 본문 속 5개 대명사에 (a)~(e) 표시를 하고 <u>밑줄</u>처리하며, 그 중 가리키는 대상이 다른 것 1개를 정답으로 합니다
+- "장문독해(1지문2문항)" 선택 시: (A)(B) 2단락 서사 지문 하나로 2문항 세트를 생성하세요
+- 이 경우 groupSize와 mode를 questions 배열 안에 함께 표시하세요
+` : ''}
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트나 설명 없이:
 {
@@ -43,13 +61,19 @@ ${categoriesPromptBlock()}
     {
       "sourceNumber": 41,
       "type": "공식 카테고리의 정확한 유형명",
-      "question": "문제 본문 (지문 포함 가능)",
-      "options": ["선택지1", "선택지2", "선택지3", "선택지4"],
-      "answer": "정답 선택지 번호 또는 내용",
-      "explanation": "정답인 이유에 대한 간단한 해설"
+      "groupId": "다문항 세트인 경우 같은 그룹ID 공유, 단일문항이면 null",
+      "groupSize": 1,
+      "mode": null,
+      "question": "문제 지시문 (예: '다음 글의 목적으로 가장 적절한 것은?')",
+      "content": "지문 본문 (필요한 마커 포함: 빈칸/번호/단락 등, <br>로 줄바꿈)",
+      "options": ["선택지1", "선택지2", "선택지3", "선택지4", "선택지5"],
+      "answer": "정답 선택지 내용 그대로",
+      "explanation": "위 해설 형식을 따른 HTML 문자열"
     }
   ]
-}`;
+}
+
+groupSize/mode 규칙: 단일 문항은 groupSize=1, mode=null. 다문항 세트(장문독해)는 groupSize=2 또는 3, mode="Composite"이며 같은 groupId를 공유합니다.`;
 
   try {
     const geminiRes = await fetch(
