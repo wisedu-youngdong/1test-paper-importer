@@ -113,8 +113,8 @@
     font-size: 11.5px; color: #374151; line-height: 1.55; margin-bottom: 8px;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
-  .item-card2-stats { font-size: 10.5px; color: #9CA3AF; }
-  .item-card2-err { font-size: 10.5px; color: #9CA3AF; margin-top: 2px; }
+  .item-card2-stats { font-size: 10.5px; color: #6B7280; font-weight: 500; }
+  .item-card2-err { font-size: 10.5px; color: #6B7280; font-weight: 500; margin-top: 2px; }
 
   .passage-modal-body {
     font-size: 13px; line-height: 1.85; color: #374151; margin: 1rem 0;
@@ -734,6 +734,12 @@ function countWordsFromHTML(html) {
   return text.split(' ').filter(Boolean).length;
 }
 
+// 카드 미리보기처럼 textContent로 표시할 때 HTML 태그 노출(예: <br>)을 막기 위해 태그만 제거
+function stripHtmlTags(html) {
+  if (!html) return '';
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function renderResult(data) {
   let rawItems = (data.items || []).slice().sort((a, b) => a.number - b.number);
 
@@ -832,7 +838,7 @@ function renderResult(data) {
     const passageBox = document.createElement('div');
     passageBox.className = 'item-card2-passage';
     if (item.passagePreview) {
-      passageBox.textContent = '"' + item.passagePreview + ' ..."';
+      passageBox.textContent = '"' + stripHtmlTags(item.passagePreview) + ' ..."';
     }
 
     // Lexile / AR / 오답률
