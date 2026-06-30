@@ -27,6 +27,12 @@ export default async function handler(req, res) {
      (예: "Flower" co-categorizes the white and yellow types ①<u>differences</u> 형태)
    - 원본에 빈칸(______ 형태)이 있다면 그대로 빈칸으로 유지하세요
    - 원본에 (A)(B)(C)(D) 단락 마커가 있다면 그대로 유지하세요
+   - [매우 중요] fullPassage에는 순수 지문 본문만 넣으세요. 다음은 절대 fullPassage에 포함하지 마세요:
+     · 문제 지시문 (예: "다음 빈칸에 들어갈 말로 가장 적절한 것은?")
+     · 5지선다 선택지 목록 (예: "① universal ② collective ③ individualist ④ romantic ⑤ capitalist")
+     · 문항 번호와 배점 표기 (예: "30. (3점)")
+     단, 지문 본문 안에 어법/어휘 문제처럼 ①②③④⑤가 단어 앞에 붙어 밑줄로 표시된 경우는
+     그 부분이 지문의 일부이므로 그대로 포함하세요 (이건 "선택지 목록"이 아니라 "지문 속 표시"입니다)
 5. 지문 첫 15단어도 별도로 발췌하세요 (목록 미리보기용)
 6. 각 지문의 대략적인 영어 단어 수를 추정하세요
 7. 각 지문의 읽기 난이도를 추정하세요:
