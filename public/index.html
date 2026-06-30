@@ -821,11 +821,13 @@ function openPassageModal(item, inSet) {
   document.getElementById('passageModalMeta').textContent = metaParts.join(' · ');
 
   const body = document.getElementById('passageModalBody');
-  if (item.passagePreview) {
+  if (item.fullPassage) {
+    body.innerHTML = item.fullPassage;
+  } else if (item.passagePreview) {
     body.innerHTML = '"' + item.passagePreview + ' ..."' +
-      '<div style="margin-top:10px;font-size:11px;color:#9CA3AF">※ 현재는 지문 앞부분 미리보기만 표시됩니다. 전체 원문 보기는 추후 업데이트 예정입니다.</div>';
+      '<div style="margin-top:10px;font-size:11px;color:#9CA3AF">※ 전체 지문 정보가 없어 미리보기만 표시됩니다.</div>';
   } else {
-    body.textContent = '미리보기 정보가 없습니다.';
+    body.textContent = '지문 정보가 없습니다.';
   }
 
   document.getElementById('passageModal').classList.add('show');
